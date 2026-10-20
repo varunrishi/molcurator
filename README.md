@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="MolCurator logo" width="320">
+</p>
+
 # MolCurator
 
 MolCurator is an AI agent that creates and curates a benchmark set of molecules, starting from a seed molecule with a desired property.
@@ -129,6 +133,7 @@ tests/           one test file per tool
 notebooks/       exploration and demo plots
 scripts/         helper scripts
 demo/            presentation and video assets
+assets/          logo and README images
 ```
 
 ## Roadmap
