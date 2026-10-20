@@ -26,7 +26,7 @@
 - Python dependencies: langgraph, langchain-core, langchain-ollama, rdkit, selfies, pyscf, chemprop (brings torch + lightning), pandas, pydantic, pyyaml, typer
 - Intel-Mac limits, set with platform markers in `pyproject.toml`: torch 2.2.2 (the last Intel-Mac wheel), so `numpy<2` and `rdkit<2026`. Other platforms get current versions.
 - External binaries (not on PyPI):
-  - **xtb**: Homebrew (`grimme-lab/qc` tap), conda-forge, or a GitHub release; found on `PATH` or through `XTB_BIN`
+  - **xtb**: conda-forge in a separate `xtb` conda env (recommended), Homebrew (`grimme-lab/qc` tap), or a GitHub release; found through `XTB_BIN`, otherwise on `PATH`
   - **Ollama**: serves `qwen3:4b`
   - **ORCA** (optional): needs a licence
   - **REINVENT4** (optional): Mol2Mol generator, installed from its git repo

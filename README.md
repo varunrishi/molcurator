@@ -83,16 +83,17 @@ On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheel
 
 xtb is not available on PyPI, so install the binary separately:
 
-```bash
-# macOS (Homebrew)
-brew tap grimme-lab/qc
-brew install xtb
+**conda-forge (recommended, prebuilt for Linux and macOS):** put xtb in its own small conda environment, kept apart from the uv `.venv`, and point `XTB_BIN` at it:
 
-# Linux / macOS (conda, if you already use it)
-conda install -c conda-forge xtb
+```bash
+conda create -n xtb -c conda-forge xtb
+export XTB_BIN="$(conda run -n xtb which xtb)"   # add to your shell profile
+"$XTB_BIN" --version
 ```
 
-Or download a release from https://github.com/grimme-lab/xtb/releases. If `xtb` is not on your `PATH`, set `XTB_BIN=/path/to/xtb`.
+**Homebrew:** `brew tap grimme-lab/qc && brew install xtb`. Newer Homebrew versions also need you to trust the tap's formulas (`brew trust`), and on Intel Macs they build from source.
+
+You can also download a release from https://github.com/grimme-lab/xtb/releases. MolCurator uses `XTB_BIN` if it is set, and otherwise looks for `xtb` on your `PATH`.
 
 ### 3. Reasoning model (Qwen3 4B)
 
@@ -112,7 +113,7 @@ ollama serve            # if the Ollama app is not already running
 
 ```bash
 python -c "import rdkit, pyscf, chemprop, selfies, langgraph; print('ok')"
-xtb --version
+"${XTB_BIN:-xtb}" --version
 ```
 
 ## Project structure
