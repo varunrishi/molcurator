@@ -1,0 +1,4 @@
+# Use case 2: candidate TADF emitters with an S1-T1 gap close to zero.
+#
+# Same keys as homo_lumo.yaml; the target is the S1-T1 energy gap (eV) below a threshold,
+# and the QM step uses TD-DFT for the S1 and T1 excitation energies.

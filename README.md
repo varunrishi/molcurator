@@ -54,6 +54,85 @@ seed molecule + target property
 - **Semi-empirical**: xTB
 - **Quantum chemistry**: [PySCF](https://pyscf.org/) or [ORCA](https://www.faccts.de/orca/)
 
+## Installation
+
+Requires Python 3.11 or newer.
+
+### 1. Python package
+
+With [uv](https://docs.astral.sh/uv/) (recommended; uses the pinned versions in `uv.lock`):
+
+```bash
+git clone git@github.com:varunrishi/molcurator.git
+cd molcurator
+uv sync                 # creates .venv/ with all dependencies, including dev tools
+source .venv/bin/activate
+```
+
+Or with pip:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically.
+
+### 2. xtb (external binary)
+
+xtb is not available on PyPI, so install the binary separately:
+
+```bash
+# macOS (Homebrew)
+brew tap grimme-lab/qc
+brew install xtb
+
+# Linux / macOS (conda, if you already use it)
+conda install -c conda-forge xtb
+```
+
+Or download a release from https://github.com/grimme-lab/xtb/releases. If `xtb` is not on your `PATH`, set `XTB_BIN=/path/to/xtb`.
+
+### 3. Reasoning model (Qwen3 4B)
+
+The agent talks to Qwen3 4B through [Ollama](https://ollama.com/):
+
+```bash
+ollama pull qwen3:4b
+ollama serve            # if the Ollama app is not already running
+```
+
+### 4. Optional
+
+- **ORCA**: an alternative to PySCF for VALIDATE. It needs a free academic licence and is downloaded from https://orcaforum.kofo.mpg.de.
+- **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
+
+### Check the install
+
+```bash
+python -c "import rdkit, pyscf, chemprop, selfies, langgraph; print('ok')"
+xtb --version
+```
+
+## Project structure
+
+```
+src/molcurator/
+├── tools/       GENERATE, PREDICT, TRAIN, VALIDATE, CURATE, EVALUATE (one module each)
+├── agent/       LangGraph graph, agent state, LLM client, prompts
+├── chem/        shared helpers: SMILES/SELFIES conversion, 3D geometry, XYZ I/O
+├── schemas.py   shared data models (Candidate, PropertyValue, CuratedEntry)
+└── cli.py       `molcurator` command
+configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml)
+data/seeds/      seed molecules
+data/runs/       per-run outputs (gitignored)
+tests/           one test file per tool
+notebooks/       exploration and demo plots
+scripts/         helper scripts
+demo/            presentation and video assets
+```
+
 ## Roadmap
 
 | Day | Date | Goal |

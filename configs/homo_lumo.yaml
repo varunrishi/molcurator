@@ -1,0 +1,10 @@
+# Use case 1: molecules with a HOMO-LUMO gap in a target range.
+#
+# Planned keys:
+#   seed_smiles:        seed molecule (or path to a file in data/seeds/)
+#   target:             property name, min / max values, units (eV)
+#   generator:          stoned_selfies | mol2mol, number of candidates per round
+#   screening:          uncertainty threshold for sending candidates to VALIDATE
+#   qm:                 backend (pyscf | orca), functional, basis set
+#   budget:             max iterations, max QM calls, target dataset size
+#   llm:                model name, Ollama URL

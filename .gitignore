@@ -45,3 +45,7 @@ scratch/
 .DS_Store
 .vscode/
 .idea/
+
+# MolCurator run outputs (dataset, geometries, models, traces)
+data/runs/*
+!data/runs/.gitkeep
