@@ -49,3 +49,6 @@ scratch/
 # MolCurator run outputs (dataset, geometries, models, traces)
 data/runs/*
 !data/runs/.gitkeep
+
+# Tools downloaded by scripts/setup.sh (xtb release, Ollama log)
+.tools/

@@ -1,7 +1,8 @@
 # Package metadata and dependencies for MolCurator.
-# Install with uv:  uv sync
-# or with pip:      pip install -e .
-# xtb is not on PyPI: install the binary separately (see README / .claude/specs/techstack.md).
+# Full setup (Python deps + xtb + LLM): scripts/setup.sh
+# Python deps only, with uv:  uv sync
+#                  with pip:  pip install -e .
+# xtb is not on PyPI; scripts/setup.sh installs it (see README).
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -18,7 +19,7 @@ dependencies = [
     # Agent
     "langgraph>=0.2",
     "langchain-core>=0.3",
-    "langchain-ollama>=0.2",   # Qwen3 4B served locally through Ollama
+    "langchain-openai>=1.0",   # any OpenAI-compatible endpoint: local Ollama (default) or hosted
     # Chemistry
     "rdkit>=2024.3",           # SMILES handling, sanitisation, 3D embedding
     "selfies>=2.1",            # STONED SELFIES generation
@@ -34,6 +35,7 @@ dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "typer>=0.12",
+    "python-dotenv>=1.0",      # loads settings (XTB_BIN, LLM_*) from .env
 ]
 
 [project.optional-dependencies]

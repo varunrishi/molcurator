@@ -48,7 +48,7 @@ seed molecule + target property
 ## Software stack
 
 - **Orchestrator**: [LangGraph](https://github.com/langchain-ai/langgraph)
-- **Reasoning model**: small language model, Qwen3 4B
+- **Reasoning model**: small language model, Qwen3 4B (local through Ollama by default, or any OpenAI-compatible endpoint)
 - **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
 - **Property prediction (ML)**: [ChemProp](https://github.com/chemprop/chemprop)
 - **Semi-empirical**: xTB
@@ -56,65 +56,62 @@ seed molecule + target property
 
 ## Installation
 
-Requires Python 3.11 or newer.
-
-### 1. Python package
-
-With [uv](https://docs.astral.sh/uv/) (recommended; uses the pinned versions in `uv.lock`):
+### Quick start
 
 ```bash
 git clone git@github.com:varunrishi/molcurator.git
 cd molcurator
-uv sync                 # creates .venv/ with all dependencies, including dev tools
+scripts/setup.sh
 source .venv/bin/activate
 ```
 
-Or with pip:
+`scripts/setup.sh` is safe to re-run. It:
+
+1. creates `.env` from `.env.example` (settings for xtb and the LLM; values already set in your environment take precedence);
+2. installs [uv](https://docs.astral.sh/uv/) if needed and runs `uv sync` (Python 3.11 and all dependencies, pinned in `uv.lock`);
+3. finds or installs **xtb**: an existing `XTB_BIN` or `xtb` on `PATH`, else a conda-forge env named `xtb` (if conda, mamba or micromamba is installed), else the official Linux release in `.tools/`. The path is saved to `.env`;
+4. sets up the **reasoning model**: starts Ollama if needed and pulls `qwen3:4b`. This step is skipped when `.env` points to a hosted endpoint, or with `--no-llm`.
+
+At the end it lists anything it could not do automatically.
+
+### What you may need to install yourself
+
+- **Ollama** (for the default local model): https://ollama.com/download. You don't need it if you use a hosted LLM.
+- **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
+
+### Choosing the LLM
+
+The agent talks to any OpenAI-compatible endpoint, configured in `.env`:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+# Default: Qwen3 4B on local Ollama
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=qwen3:4b
+LLM_API_KEY=ollama
+
+# Hosted provider or GPU server (vLLM, LM Studio, ...): nothing to install locally
+LLM_BASE_URL=https://<provider>/v1
+LLM_MODEL=<model name>
+LLM_API_KEY=<your key>
+```
+
+On a CPU-only laptop (e.g. an Intel Mac), Qwen3 4B takes about 40 s per agent step; a GPU or hosted endpoint is much faster.
+
+### Manual install (without the script)
+
+```bash
+uv sync                       # or: python3.11 -m venv .venv && pip install -e .
+conda create -n xtb -c conda-forge xtb
+cp .env.example .env          # then set XTB_BIN=$(conda run -n xtb which xtb)
+ollama pull qwen3:4b
 ```
 
 On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically.
 
-### 2. xtb (external binary)
-
-xtb is not available on PyPI, so install the binary separately:
-
-**conda-forge (recommended, prebuilt for Linux and macOS):** put xtb in its own small conda environment, kept apart from the uv `.venv`, and point `XTB_BIN` at it:
-
-```bash
-conda create -n xtb -c conda-forge xtb
-export XTB_BIN="$(conda run -n xtb which xtb)"   # add to your shell profile
-"$XTB_BIN" --version
-```
-
-**Homebrew:** `brew tap grimme-lab/qc && brew install xtb`. Newer Homebrew versions also need you to trust the tap's formulas (`brew trust`), and on Intel Macs they build from source.
-
-You can also download a release from https://github.com/grimme-lab/xtb/releases. MolCurator uses `XTB_BIN` if it is set, and otherwise looks for `xtb` on your `PATH`.
-
-### 3. Reasoning model (Qwen3 4B)
-
-The agent talks to Qwen3 4B through [Ollama](https://ollama.com/):
-
-```bash
-ollama pull qwen3:4b
-ollama serve            # if the Ollama app is not already running
-```
-
-### 4. Optional
+### Optional
 
 - **ORCA**: an alternative to PySCF for VALIDATE. It needs a free academic licence and is downloaded from https://orcaforum.kofo.mpg.de.
 - **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
-
-### Check the install
-
-```bash
-python -c "import rdkit, pyscf, chemprop, selfies, langgraph; print('ok')"
-"${XTB_BIN:-xtb}" --version
-```
 
 ## Project structure
 

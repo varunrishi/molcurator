@@ -7,4 +7,5 @@
 #   screening:          uncertainty threshold for sending candidates to VALIDATE
 #   qm:                 backend (pyscf | orca), functional, basis set
 #   budget:             max iterations, max QM calls, target dataset size
-#   llm:                model name, Ollama URL
+#   llm:                optional overrides of LLM_MODEL / LLM_BASE_URL from .env,
+#                       temperature, max agent steps
