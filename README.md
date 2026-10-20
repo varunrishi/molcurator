@@ -17,7 +17,7 @@ Given a seed molecule and a target property (e.g. a HOMO-LUMO gap range), the ag
 
 ## Approach
 
-A small language model reasons over the workflow and calls specialised tools:
+The workflow is a fixed sequence of tool steps. A fast language model (Claude Haiku 4.5 by default) makes the decisions inside it: how to generate each round, which candidates get quantum chemistry, and when to stop. Every decision also has a rule-based fallback.
 
 1. **Generate**: create candidate molecules from the seed molecule.
 2. **Screen**: predict the target property with an ML model and keep candidates that meet the threshold values.
@@ -52,7 +52,7 @@ seed molecule + target property
 ## Software stack
 
 - **Orchestrator**: [LangGraph](https://github.com/langchain-ai/langgraph)
-- **Reasoning model**: small language model, Qwen3 4B (local through Ollama by default, or any OpenAI-compatible endpoint)
+- **Decision model**: [Claude Haiku 4.5](https://docs.claude.com/) through the Anthropic SDK (~2 s per decision); optionally any OpenAI-compatible endpoint, such as a local model in Ollama
 - **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
 - **Property prediction (ML)**: [ChemProp](https://github.com/chemprop/chemprop)
 - **Semi-empirical**: xTB
@@ -74,32 +74,34 @@ source .venv/bin/activate
 1. creates `.env` from `.env.example` (settings for xtb and the LLM; values already set in your environment take precedence);
 2. installs [uv](https://docs.astral.sh/uv/) if needed and runs `uv sync` (Python 3.11 and all dependencies, pinned in `uv.lock`);
 3. finds or installs **xtb**: an existing `XTB_BIN` or `xtb` on `PATH`, else a conda-forge env named `xtb` (if conda, mamba or micromamba is installed), else the official Linux release in `.tools/`. The path is saved to `.env`;
-4. sets up the **reasoning model**: starts Ollama if needed and pulls `qwen3:4b`. This step is skipped when `.env` points to a hosted endpoint, or with `--no-llm`.
+4. sets up the optional **local model**: starts Ollama if needed and pulls `qwen3:4b`. Skip it with `--no-llm`; the default Claude backend only needs `ANTHROPIC_API_KEY` in `.env`.
 
 At the end it lists anything it could not do automatically.
 
 ### What you may need to install yourself
 
-- **Ollama** (for the default local model): https://ollama.com/download. You don't need it if you use a hosted LLM.
+- **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
+- **Ollama** (optional, for a local model): https://ollama.com/download.
 - **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
 
 ### Choosing the LLM
 
-The agent talks to any OpenAI-compatible endpoint, configured in `.env`:
+Decisions are made by Claude Haiku 4.5 by default, configured in `.env`:
 
 ```bash
-# Default: Qwen3 4B on local Ollama
+# Default: Claude Haiku 4.5 through the Anthropic API (~2 s per decision)
+ANTHROPIC_API_KEY=<your key>
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-haiku-4-5
+
+# Optional: any OpenAI-compatible endpoint, e.g. a local model in Ollama
+LLM_PROVIDER=openai
 LLM_BASE_URL=http://localhost:11434/v1
 LLM_MODEL=qwen3:4b
 LLM_API_KEY=ollama
-
-# Hosted provider or GPU server (vLLM, LM Studio, ...): nothing to install locally
-LLM_BASE_URL=https://<provider>/v1
-LLM_MODEL=<model name>
-LLM_API_KEY=<your key>
 ```
 
-On a CPU-only laptop (e.g. an Intel Mac), Qwen3 4B takes about 40 s per agent step; a GPU or hosted endpoint is much faster.
+For tests and fast development runs, set `decisions: rules` in the run config: every decision then uses its rule (<1 ms) and no LLM is called. A local model on a CPU-only laptop is slow (Qwen3 4B: ~40 s per decision, or minutes with thinking on).
 
 ### Manual install (without the script)
 
@@ -107,7 +109,7 @@ On a CPU-only laptop (e.g. an Intel Mac), Qwen3 4B takes about 40 s per agent st
 uv sync                       # or: python3.11 -m venv .venv && pip install -e .
 conda create -n xtb -c conda-forge xtb
 cp .env.example .env          # then set XTB_BIN=$(conda run -n xtb which xtb)
-ollama pull qwen3:4b
+# add ANTHROPIC_API_KEY to .env
 ```
 
 On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically.

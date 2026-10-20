@@ -15,8 +15,8 @@ Build each tool as a standalone, testable unit with a clear input/output interfa
 
 ## Phase 2: Agent orchestration and use cases (Day 2, 21 Oct 2026)
 
-- [ ] Wire the tools into a LangGraph orchestrator driven by Qwen3 4B.
-- [ ] Implement the loop: generate → screen (ML + threshold + uncertainty) → validate (QM) → curate → retrain.
+- [ ] Wire the tools into a LangGraph orchestrator with LLM decision nodes (Claude Haiku 4.5 by default, rule-based fallback).
+- [ ] Implement the loop: generate → predict + screen (xTB, threshold with margin) → validate (QM) → curate. ChemProp training and ML screening are deferred to a later phase (triggered when the dataset reaches a size threshold).
 - [ ] **Use case 1**: molecules within a specific HOMO-LUMO gap range.
 - [ ] **Use case 2**: candidate TADF emitters with an S1-T1 gap close to zero.
 - [ ] Run EVALUATE on the agent trajectories for both use cases.
