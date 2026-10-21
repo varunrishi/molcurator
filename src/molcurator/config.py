@@ -57,7 +57,9 @@ class PredictSettings(StrictModel):
 
 
 class TrainSettings(StrictModel):
-    min_examples: int = Field(default=200, ge=1)  # train once this many molecules have xTB values (R10.2)
+    # Train once this many molecules have xTB values (R10.2). Below predict.n_xtb (200), because ~7% of
+    # xTB runs fail: 200 runs give ~186 values, and 200 would make round 1 skip TRAIN and leave its rest unscored.
+    min_examples: int = Field(default=150, ge=1)
 
 
 class QMConfig(QMSettings):
