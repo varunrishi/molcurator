@@ -3,17 +3,24 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from rdkit import Chem
 
 from molcurator.schemas import GenerationSettings, PropertyTarget, QMSettings
 
 
-class ScreeningSettings(BaseModel):
+class StrictModel(BaseModel):
+    """Config models reject unknown keys, so a misspelled YAML field raises instead of silently
+    falling back to its default (e.g. `max_qm_call: 5` would otherwise leave 20 QM calls)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ScreeningSettings(StrictModel):
     margin: float = Field(default=0.2, ge=0)  # widens the target window for xTB's systematic error (R1.4)
 
 
-class BudgetSettings(BaseModel):
+class BudgetSettings(StrictModel):
     """Hard limits, enforced in code whatever the LLM decides (R4.1, R4.3)."""
 
     max_rounds: int = Field(default=5, ge=1)
@@ -22,7 +29,7 @@ class BudgetSettings(BaseModel):
     max_wall_time: float = Field(default=3600, gt=0)  # seconds
 
 
-class GenerationLimits(BaseModel):
+class GenerationLimits(StrictModel):
     """What the plan-round decision may choose; tighter than the schema's hard bounds (R3.1)."""
 
     generators: list[str] = ["stoned_selfies"]
@@ -38,21 +45,39 @@ class GenerationLimits(BaseModel):
         return self
 
 
-class LLMSettings(BaseModel):
+class LLMSettings(StrictModel):
     provider: Literal["anthropic", "openai"] | None = None  # None: LLM_PROVIDER from .env (R9.1)
     model: str | None = None  # None: LLM_MODEL from .env
     timeout_s: float = Field(default=10, gt=0)  # after this, the node's rule decides (R9.5)
     max_table_rows: int = Field(default=20, ge=1)  # candidates shown to the QM-batch decision (R3.2)
 
 
-class RunConfig(BaseModel):
+class PredictSettings(StrictModel):
+    n_xtb: int = Field(default=200, ge=1)  # xTB on a random sample of this many new candidates per round (R10.1)
+
+
+class TrainSettings(StrictModel):
+    min_examples: int = Field(default=200, ge=1)  # train once this many molecules have xTB values (R10.2)
+
+
+class QMConfig(QMSettings):
+    """The contract's QM settings plus whether to run QM at all; validate() still gets QMSettings fields."""
+
+    model_config = ConfigDict(extra="forbid")  # extends the contract's model, so not a StrictModel
+
+    enabled: bool = False  # QM is slow, so the agent skips it unless a config turns it on (R11.1)
+
+
+class RunConfig(StrictModel):
     """One run: what to look for, where to start, and the limits (configs/<use case>.yaml)."""
 
     target: PropertyTarget
     seeds: list[str] = Field(min_length=1)  # starting SMILES for round 1 (R1.3)
     generation: GenerationLimits = GenerationLimits()
     screening: ScreeningSettings = ScreeningSettings()
-    qm: QMSettings = QMSettings()  # ORCA by default
+    predict: PredictSettings = PredictSettings()
+    train: TrainSettings = TrainSettings()
+    qm: QMConfig = QMConfig()  # ORCA by default; off unless enabled
     budget: BudgetSettings = BudgetSettings()
     decisions: Literal["llm", "rules"] = "llm"  # "rules": no LLM calls at all (R9.4)
     llm: LLMSettings = LLMSettings()
