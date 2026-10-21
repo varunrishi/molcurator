@@ -47,6 +47,17 @@ def heavy_atom_count(smiles: str) -> int:
     return Chem.MolFromSmiles(smiles).GetNumHeavyAtoms()
 
 
+def ring_profile(smiles: str) -> tuple[int, bool]:
+    """Number of rings, and whether any atom is aromatic.
+
+    Used to check that a candidate kept its parent's ring system: random SELFIES edits
+    open fused aromatics into chains, which destroys the conjugation that sets the
+    electronic properties the run is searching for.
+    """
+    mol = Chem.MolFromSmiles(smiles)  # keep the Mol referenced: RingInfo does not own it
+    return mol.GetRingInfo().NumRings(), any(a.GetIsAromatic() for a in mol.GetAtoms())
+
+
 # An sp carbon with two double bonds: the centre of an allene, cumulene or ketene.
 # The centre is pinned to carbon on purpose, so sulfones (O=S=O) and neutral nitro
 # groups (N(=O)=O) are kept - both are common acceptor units in TADF emitters.
