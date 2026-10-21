@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MolCurator Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+<script>
+
+/* Resilient library loader: try a locally vendored copy first (webapp/lib/, served by the
+   backend — works offline), then jsDelivr, then unpkg/cdnjs. Fires "molc-libs-ready" when
+   both settle so the app boots regardless of which source succeeded. */
+(function(){
+  var OCL_SRCS=[
+    "lib/openchemlib-full.js",
+    "https://cdn.jsdelivr.net/npm/openchemlib@8.15.0/dist/openchemlib-full.js",
+    "https://unpkg.com/openchemlib@8.15.0/dist/openchemlib-full.js"
+  ];
+  var D3_SRCS=[
+    "lib/3Dmol-min.js",
+    "https://cdn.jsdelivr.net/npm/3dmol@2.1.0/build/3Dmol-min.js",
+    "https://unpkg.com/3dmol@2.1.0/build/3Dmol-min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
+  ];
+  function tryLoad(srcs,isReady,done){
+    var i=0;
+    (function next(){
+      if(isReady()){done(true);return;}
+      if(i>=srcs.length){done(false);return;}
+      var s=document.createElement("script");s.src=srcs[i++];s.async=false;
+      s.onload=function(){isReady()?done(true):next();};
+      s.onerror=function(){next();};
+      document.head.appendChild(s);
+    })();
+  }
+  var pending=2,res={};
+  function fin(){ if(--pending===0){ window.__molcLibs=res; window.dispatchEvent(new Event("molc-libs-ready")); } }
+  tryLoad(OCL_SRCS,function(){return !!(window.OCL&&window.OCL.Molecule);},function(ok){res.ocl=ok;fin();});
+  tryLoad(D3_SRCS,function(){return !!window.$3Dmol;},function(ok){res.d3=ok;fin();});
+})();
+
+</script>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <span class="logo">Mol<b>Curator</b></span>
+    </div>
+    <div class="bar-spacer"></div>
+    <div class="apibar">
+      <label for="apiInput">API</label>
+      <input id="apiInput" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Backend API base URL">
+      <button class="btn sm" id="apiReconnect">Connect</button>
+    </div>
+    <span id="mode" class="modepill" title="Checking backend…"><span class="dot"></span></span>
+    <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </header>
+
+  <main>
+    <!-- ============ LEFT: seed & target ============ -->
+    <div class="col">
+      <section class="panel" style="order:2">
+        <div class="section">
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <div class="eyebrow"><span class="n">03</span> Seed structure</div>
+            <div class="tabs" role="tablist" aria-label="Seed input mode">
+              <button role="tab" id="tabDraw" aria-selected="true">Draw</button>
+              <button role="tab" id="tabSmiles" aria-selected="false">SMILES</button>
+            </div>
+          </div>
+
+          <div id="paneDraw">
+            <div id="editorWrap">
+              <div id="editor"></div>
+              <div id="editorFallback">Structure sketcher could not load.<br>Switch to the SMILES tab to enter a structure.</div>
+            </div>
+            <p class="note" style="margin:8px 0 0">Draw a molecule — the SMILES and 3D view update as you edit.</p>
+          </div>
+
+          <div id="paneSmiles" hidden>
+            <div class="field">
+              <label for="smilesIn">SMILES input</label>
+              <textarea id="smilesIn" class="smiles" spellcheck="false" autocapitalize="off" autocomplete="off">c1ccc2c(c1)ccc1ccccc12</textarea>
+            </div>
+            <div class="valid" id="smilesValid"></div>
+            <div class="row wrap" style="margin-top:8px">
+              <button class="btn sm" data-ex="c1ccc2c(c1)ccc1ccccc12">Anthracene</button>
+              <button class="btn sm" data-ex="O=C1c2ccccc2C(=O)c2ccccc21">Anthraquinone</button>
+              <button class="btn sm" data-ex="c1ccc(-c2ccc(-c3ccccc3)cc2)cc1">Terphenyl</button>
+              <button class="btn sm" data-ex="CN1C=NC2=C1C(=O)N(C)C(=O)N2C">Caffeine</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="eyebrow" style="margin-bottom:10px">Canonical seed</div>
+          <div class="seedline">
+            <code id="seedSmiles" class="mono">—</code>
+            <button class="btn sm ghost" id="copySeed" title="Copy SMILES">Copy</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="eyebrow" style="margin-bottom:10px"><span class="n">04</span> 3D geometry <span id="geomSrc" class="chip" style="margin-left:auto">RDKit/OCL embed</span></div>
+          <div id="viewer3d"><div class="v3d-empty" id="v3dEmpty">Enter a valid structure to preview its 3D geometry.</div></div>
+          <div class="v3d-tools">
+            <button class="btn sm" id="spinBtn">Spin</button>
+            <button class="btn sm" id="dlXyz">Download .xyz</button>
+            <button class="btn sm" id="copyXyz">Copy .xyz</button>
+          </div>
+          <p class="note" style="margin:8px 0 0">A quick conformer for visualisation. The pipeline re-optimises geometry with xTB before any property is reported.</p>
+        </div>
+      </section>
+
+      <section class="panel" style="order:1">
+        <div class="section">
+          <div class="eyebrow" style="margin-bottom:6px"><span class="n">01</span> Target HOMO–LUMO gap</div>
+          <div class="range" id="rangeWidget">
+            <div class="track"></div><div class="fill" id="rangeFill"></div>
+            <input type="range" id="rMin" min="0" max="10" step="0.05" value="3">
+            <input type="range" id="rMax" min="0" max="10" step="0.05" value="5">
+          </div>
+          <div class="range-io">
+            <input id="minIn" type="number" min="0" max="10" step="0.05" value="3.00" aria-label="Minimum gap">
+            <span class="sep">to</span>
+            <input id="maxIn" type="number" min="0" max="10" step="0.05" value="5.00" aria-label="Maximum gap">
+            <span class="unit">eV</span>
+            <span class="grow"></span>
+            <span class="note" id="rangeNote"></span>
+          </div>
+        </div>
+        <div class="section">
+          <div class="eyebrow" style="margin-bottom:10px"><span class="n">02</span> Run settings</div>
+          <div class="grid2">
+            <div class="mini"><label for="nCand">Candidates / round</label><input id="nCand" type="number" min="4" max="500" step="4" value="48"></div>
+            <div class="mini"><label for="nRounds">Rounds</label><input id="nRounds" type="number" min="1" max="8" value="3"></div>
+            <div class="mini"><label for="mStrength">Mutation strength</label><input id="mStrength" type="number" min="1" max="5" value="2"></div>
+            <div class="mini"><label for="genSel">Generator</label>
+              <select id="genSel"><option value="gb_ga">GB-GA (Jensen)</option><option value="demo">Graph-edit (demo)</option></select>
+            </div>
+            <div class="mini" style="grid-column:1/-1"><label for="predSel">Prediction model</label>
+              <select id="predSel" disabled>
+                <option value="auto">Auto (best available)</option>
+                <option value="delfta">DelFTa — ML, ≈ ωB97X-D/def2-SVP</option>
+                <option value="tblite">GFN2-xTB (tblite) — semi-empirical QM</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn primary" id="runBtn" style="width:100%;margin-top:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
+            <span id="runLabel">Generate &amp; screen</span>
+          </button>
+          <div class="progress" id="progWrap" hidden><i id="progBar"></i></div>
+          <div class="runlog" id="runLog" hidden></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ RIGHT: explorer ============ -->
+    <div class="col">
+      <section class="panel" style="flex:1;display:flex;flex-direction:column">
+        <div class="section">
+          <div class="explorer-head">
+            <h2>Candidate explorer</h2>
+            <span class="count" id="exCount">no candidates yet</span>
+            <span class="grow"></span>
+            <div class="filters" role="tablist" aria-label="Filter">
+              <button role="tab" data-filter="all" aria-selected="true">All</button>
+              <button role="tab" data-filter="hits" aria-selected="false">In target</button>
+              <button role="tab" data-filter="fail" aria-selected="false">Failed</button>
+            </div>
+            <select id="sortSel" class="mini" style="width:auto;padding:6px 8px">
+              <option value="dist">Sort: closest to window</option>
+              <option value="asc">Gap ↑</option>
+              <option value="desc">Gap ↓</option>
+              <option value="round">Round</option>
+            </select>
+          </div>
+          <div id="banner" class="banner" style="margin-top:12px" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+            <span id="bannerText"></span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="eyebrow" style="margin-bottom:8px">Gap distribution <span class="note" style="text-transform:none;letter-spacing:0;margin-left:auto">amber band = target window · teal line = seed</span></div>
+          <div class="dist" id="dist"><div class="axis"><span>0</span><span>eV</span><span>10</span></div></div>
+        </div>
+
+        <div class="section" style="flex:1">
+          <div id="cardsWrap">
+            <div class="empty" id="emptyState">Set a seed and a target window, then <b>Generate &amp; screen</b> to populate the explorer.</div>
+            <div class="cards" id="cards" hidden></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- detail overlay -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="dTitle">Candidate</h3>
+      <span id="dBadge" class="chip">—</span>
+      <button class="iconbtn" id="closeSheet" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/chem.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
