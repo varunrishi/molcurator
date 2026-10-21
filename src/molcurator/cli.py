@@ -12,18 +12,28 @@ def main() -> None:
 
 
 @app.command()
-def run(config: Path = typer.Option(..., "--config", "-c", exists=True, dir_okay=False, help="Run config YAML."),
+def run(config: Path | None = typer.Option(None, "--config", "-c", exists=True, dir_okay=False, help="Run config YAML."),
+        resume: str | None = typer.Option(None, help="Continue this interrupted run, with its saved config."),
         run_id: str | None = typer.Option(None, help="Run folder name (default: UTC time + random suffix)."),
         runs_root: Path = typer.Option(Path("data/runs"), help="Where run folders are created.")) -> None:
-    """Run the agent for one use case; outputs go to <runs-root>/<run-id>/."""
+    """Run the agent for one use case, or --resume an interrupted run; outputs go to <runs-root>/<run-id>/."""
     from rich.console import Console
 
     from molcurator.agent.progress import progress_text
-    from molcurator.agent.runner import run_agent  # imported here so --help stays instant
+    from molcurator.agent.runner import resume_agent, run_agent  # imported here so --help stays instant
     from molcurator.config import load_config
+    if (config is None) == (resume is None):
+        raise typer.BadParameter("give either --config for a new run or --resume <run_id>, not both")
     console = Console()
-    state = run_agent(load_config(config), runs_root=runs_root, run_id=run_id,
-                      on_event=lambda event: console.print(progress_text(event)))  # live progress (R8.3)
+    show = lambda event: console.print(progress_text(event))  # noqa: E731 (live progress, R8.3)
+    if resume:
+        try:
+            state = resume_agent(resume, runs_root, on_event=show)
+        except ValueError as e:  # nothing to resume: the run finished or has no checkpoint
+            console.print(f"Cannot resume: {e}", markup=False)
+            raise typer.Exit(code=2)
+    else:
+        state = run_agent(load_config(config), runs_root=runs_root, run_id=run_id, on_event=show)
     console.print(f"Run {state['run_id']} stopped: {state['stop_reason']}. Dataset size: {state['dataset_size']}.")
     console.print(f"Outputs: {state['run_dir']}" + (f"\nError: {state['error']}" if state["error"] else ""), markup=False)
     raise typer.Exit(code=1 if state["error"] else 0)
