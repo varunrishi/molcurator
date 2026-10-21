@@ -19,6 +19,7 @@ class MoleculeRecord(TypedDict):
     status: MoleculeStatus
     xtb: float | None  # PREDICT value
     qm: float | None  # VALIDATE value
+    qm_method: str | None  # level of theory named by VALIDATE, e.g. "dft:B3LYP/def2-SVP"; CURATE's key
     xyz_path: str | None  # a str, not a Path, so checkpoints hold plain data
     error: str | None  # why it failed (R1.6)
 
@@ -40,6 +41,7 @@ class AgentState(TypedDict):
     """The whole run as LangGraph sees it; each node returns only the fields it changes."""
 
     run_id: str
+    run_dir: str  # the run folder (data/runs/<run_id>/ or a test folder); a str so checkpoints hold plain data
     round: int  # current round, starting at 1
     molecules: dict[str, MoleculeRecord]  # by id; seen SMILES are derived from these + seeds (R1.5)
     round_plan: dict | None  # this round's plan decision (RoundPlan.model_dump()), plain data

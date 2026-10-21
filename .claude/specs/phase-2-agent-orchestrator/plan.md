@@ -99,6 +99,7 @@ class MoleculeRecord(TypedDict):
 
 class AgentState(TypedDict):
     run_id: str
+    run_dir: str                    # run folder, set once by the runner (tests: a temp folder)
     round: int
     molecules: dict[str, MoleculeRecord]
     round_plan: dict | None         # this round's RoundPlan decision, as plain data
