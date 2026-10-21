@@ -17,8 +17,9 @@
     OpenAI-compatible endpoints such as local Ollama. (R3.1–R3.5, R9.1, R9.5)
   - `RuleDecider`: the fallback rules from R3.5, used for `decisions: rules` and by
     `LLMDecider` as its fallback. (R3.5, R9.4)
-  - `ScriptedDecider` (tests): returns queued answers, including invalid ones, to exercise
-    the retry and fallback paths. (R9.1)
+  - `ScriptedDecider` (tests): returns queued answers per node, as if an LLM answered, and the
+    rules once a queue is empty, to steer the graph in tests. The retry and fallback paths live
+    in `LLMDecider` and are tested there with a fake Anthropic client. (R9.1)
   The Anthropic SDK is used directly rather than through LangChain: it is the documented way
   to get schema-validated output from Claude, and the latency check used exactly this path
   (Haiku 4.5: 2.2 s median, 3/3 valid). LangGraph does not need a LangChain chat model for
