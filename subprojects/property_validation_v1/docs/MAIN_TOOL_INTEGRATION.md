@@ -19,3 +19,34 @@ Scope is neutral closed-shell HOMO-LUMO gaps. PySCF, TADF and ML selection remai
 This integration PR includes the implementation from PRs #3 and #4 plus the missing root entry points, packaging and public-import tests. It supersedes separately integrating those implementation-only patches for this use case. Merge through review; no direct changes to main are made.
 
 Tests verify public imports, argument/result delegation, mixed failures, configured ORCA method and geometry reuse. External program output is simulated; actual cluster compatibility still needs real calculations. The root install/wheel check verifies that both package trees are included.
+
+## Automated setup and checks
+
+From the root checkout after this PR is merged (or on this branch):
+
+```bash
+bash scripts/setup.sh --no-llm
+```
+
+The existing setup creates/refreshes the locked Python environment with uv and finds/installs xTB where supported. It now finishes with the chemistry preflight and exits nonzero if a dependency or required executable is unavailable. ORCA must be installed separately under its license, or loaded through the cluster's modules. Set `XTB_BIN` and `ORCA_BIN` to absolute executable paths in `.env`; existing exported process settings take precedence. Only chemistry path/timeout keys are loaded by the tool; no API key is needed for these calculations.
+
+Recheck without reinstalling or calculating:
+
+```bash
+uv run --no-sync python scripts/check_property_tools.py --backend all
+# Machine-readable output:
+uv run --no-sync python scripts/check_property_tools.py --backend all --json
+```
+
+This verifies Python 3.11+, required tool imports, executable resolution and executable permission. Finding a file does not establish that its shared libraries, runtime modules, MPI environment or license work. The output explicitly states that runtime has not been tested. Run `--backend xtb` for xTB-only readiness or `--backend orca` for ORCA-only readiness.
+
+On an allocated compute node, opt into a real one-molecule check:
+
+```bash
+uv run --no-sync python scripts/check_property_tools.py \
+  --backend all --smoke --out data/runs/tool-check-001
+```
+
+Use a new output directory each time. This performs real ethanol geometry preparation, xTB and one ORCA single point, saves raw calculation artifacts plus `preflight-smoke.json`, and exits nonzero on failure. `--backend orca --smoke` uses an explicitly FF-only geometry, not the xTB/B3LYP calibration protocol. No chemistry runs during the default availability check or setup preflight. Use `--env-file` if settings are not in the root `.env`.
+
+The full project's dependency sync includes ML/agent dependencies and PySCF; native-platform package support is still required. This change reports failures rather than claiming it can automatically install licensed ORCA or fix cluster runtime modules.
