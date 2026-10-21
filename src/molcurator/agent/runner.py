@@ -38,7 +38,8 @@ def default_decider(config: RunConfig) -> Decider:
     """The decider for the config's mode; run_agent and resume_agent share it, so a resumed run
     decides exactly as the original would have (R9.4)."""
     if config.decisions == "llm":
-        raise NotImplementedError("the LLM decider is not built yet (Phase 2 step 8); set decisions: rules")
+        from molcurator.agent.llm import make_llm_decider  # imported here: rules-mode runs never load the SDK
+        return make_llm_decider(config)
     return RuleDecider()
 
 

@@ -30,6 +30,23 @@ class RoundPlan(BaseModel):
                                   mutation_strength=self.mutation_strength)
 
 
+def check_plan(plan: RoundPlan, state: AgentState, config: RunConfig) -> None:
+    """Raise ValueError if a round plan breaks the config's limits or names a parent it was not offered
+    (R3.1). The message lists every problem: it is sent back to the LLM on its one retry (R3.5)."""
+    limits, offered = config.generation, parent_options(state, config)
+    problems = [f"unknown parent id {p!r}; choose from {sorted(offered)}" for p in plan.parents if p not in offered]
+    if len(set(plan.parents)) != len(plan.parents):
+        problems.append("parent ids must not repeat")
+    if plan.generator not in limits.generators:
+        problems.append(f"generator must be one of {limits.generators}")
+    if not 1 <= plan.n_candidates <= limits.max_candidates:
+        problems.append(f"n_candidates must be between 1 and {limits.max_candidates}")
+    if not 1 <= plan.mutation_strength <= limits.max_mutation_strength:
+        problems.append(f"mutation_strength must be between 1 and {limits.max_mutation_strength}")
+    if problems:
+        raise ValueError("; ".join(problems))
+
+
 class QMBatchDecision(BaseModel):
     """Select-QM-batch decision: which screened candidates get expensive QM, best first (R3.2)."""
 
