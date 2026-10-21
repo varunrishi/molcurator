@@ -1,13 +1,67 @@
-# Agent trajectory evaluation (provisional contract)
+# Agent trajectory evaluation
 
 This independent evaluator checks saved events without executing the agent or
 editing its tools/contracts. It is separate from the dataset evaluator PR #14.
 
-**Trace integration is pending Varun's confirmation in issue #13.** At inspection,
-`origin/agent/orchestrator` commit `4231bb0` has tool nodes but no trace writer or
-`docs/trace-format.md`. This adapter is a concrete proposal for that writer, not
-a claim that current runs emit this format. Rename/adapt fields in this module
-once a representative trace is agreed; no orchestrator changes are included.
+Two readers are supported. The default `auto` mode recognizes the agreed agent
+trace v1 from `run_start` or compact result rows. The original provisional reader
+remains available for existing callers and full-result synthetic fixtures.
+
+## Agreed agent trace v1 (work in progress)
+
+The specification is `docs/trace-format.md` on main, introduced by `84fe9ec`
+and merged in `ad4e119`. It records rules-only execution with QM off; it explicitly
+does not define QM launch/cache details or resumed event identities. Agreement
+in issue #13 does not make those missing capabilities measurable.
+
+```bash
+python scripts/evaluate_trajectory.py data/runs/RUN/traces/trace.jsonl \
+  --out trajectory-report.json
+```
+
+Budgets and execution modes are inferred from `run_start.inputs.config`; optional
+budget flags override only specified limits and are recorded in report metadata.
+Contradictory execution-mode overrides are rejected. Use `--format agent-v1` or
+`--format provisional-v1` to force a reader. The Python function accepts the same
+choice as `trace_format=`. Legacy calls with explicit budgets retain their behavior.
+
+The reader supports the run-level null round, documented event identity scheme,
+top-level `reason`, sorted `[id, status, value_or_error]` rows, generation plans,
+training model summaries, `unscored` ML fallbacks, empty/no-op outputs, round
+statistics, and next-round/stop-reason decisions. It checks ordering against
+`run_start.inputs.nodes`, not a fixed node list. Whole-step failures must route
+to the final summary; per-molecule failures remain visible inside successful nodes.
+
+Reports explicitly separate `checks` on available evidence from `capabilities`.
+`overall_scope: available_evidence_only` means a pass is not a claim that every
+agent capability was exercised. In particular, with QM disabled:
+
+```json
+{"status":"not_measurable","label":"QM behavior: not measurable","reason":"QM disabled"}
+```
+
+`observed_qm_launches` is null in this format. `reported_qm_calls` is a separate
+sum of round counters, not proof of external process launches. Original tool
+return order cannot be reconstructed from rows sorted after execution. Geometry
+handoff, complete training provenance, per-child parent lineage, recipe/cache
+reuse and actual LLM behavior are also explicitly not measurable. Rule decision
+metadata can be checked without claiming an LLM ran.
+
+Missing results are unavailable evidence rather than invented molecule failures;
+malformed recorded results remain violations. Fake-tool placeholder SMILES cannot
+establish molecular identity. Unknown future nodes, skip reasons, QM-enabled v1
+traces, and resume produce explicit unsupported/not-assessable findings instead
+of guessed tool signatures. Source files and producer contracts are not changed.
+
+The real-agent failure-handling demo is documented in
+`demo/trajectory-v1/README.md`. It produces a trace with actual graph/tool execution,
+not fabricated JSONL, while explicitly keeping xTB unavailable and QM off.
+
+## Original provisional reader (compatibility)
+
+The remaining sections describe the pre-agreement full-result format, not the
+compact format produced by the current agent. Its per-item launch fields remain
+useful for offline tests and a future richer producer; they are not invented for v1.
 
 ## Entry points
 
@@ -152,7 +206,8 @@ python -m pytest tests/test_trajectory_evaluation.py tests/test_evaluate_traject
 
 Tests use synthetic traces and the same isolated RDKit/Pydantic/pytest environment
 as dataset evaluation. No LLM keys, LangGraph runtime or chemistry binaries are
-needed. Synthetic passes establish evaluator behavior only. Teammate integration
-still requires an agreed producer format and one representative real trace.
+needed for reader unit tests. Include `tests/test_trace_v1_evaluation.py` for the
+agreed compact reader. Synthetic passes establish evaluator behavior only. The
+separate real-agent demo requires LangGraph, PyYAML and SELFIES as well.
 Partial histories, concurrent execution, distributed clock skew, model accuracy,
 automatic trace collection and raw chemistry-log reconciliation are outside v1.

@@ -1,4 +1,4 @@
-"""Offline checks for provisional version-1 agent traces (coordination issue #13).
+"""Offline checks for agreed agent-v1 and original provisional traces (issue #13).
 
 This module consumes evidence; it never executes tools or changes agent contracts.
 Absent per-molecule or launch evidence yields not_assessable, never an assumed pass.
@@ -77,7 +77,7 @@ def _ids(value):
     return value
 
 
-def evaluate_trajectory(events: list[dict], *, budgets: dict, qm_enabled: bool = True,
+def _evaluate_provisional(events: list[dict], *, budgets: dict, qm_enabled: bool = True,
                         ml_enabled: bool = False, source: dict | None = None) -> dict:
     """Check one serial run using the documented provisional v1 evidence adapter.
 
@@ -448,3 +448,39 @@ def evaluate_trajectory(events: list[dict], *, budgets: dict, qm_enabled: bool =
                              observed_qm_launches=launched, unknown_qm_events=unknown_launches,
                              elapsed_s=elapsed, dataset_size=dataset_size,
                              finding_counts=dict(Counter(item["code"] for item in findings))))
+
+
+def evaluate_trajectory(events: list[dict], *, budgets: dict | None = None,
+                        qm_enabled: bool | None = None, ml_enabled: bool | None = None,
+                        source: dict | None = None, trace_format: str = "auto") -> dict:
+    """Read agreed agent-v1 traces or retain the original provisional interface.
+
+    Agent-v1 policy defaults come from run_start. Explicit budget overrides are
+    recorded, while conflicting execution-mode overrides are rejected.
+    """
+    if trace_format not in ("auto", "agent-v1", "provisional-v1"):
+        raise ValueError("trace_format must be auto, agent-v1 or provisional-v1")
+    def is_compact(event):
+        if not isinstance(event, dict):
+            return False
+        if event.get("node") == "run_start":
+            return True
+        outputs = event.get("outputs")
+        results = outputs.get("results") if isinstance(outputs, dict) else None
+        return isinstance(results, list) and any(isinstance(row, list) for row in results)
+    compact = any(is_compact(event) for event in events)
+    if trace_format == "agent-v1" or (trace_format == "auto" and compact):
+        from molcurator.trace_v1_evaluation import evaluate_agent_v1
+        return evaluate_agent_v1(events, budgets=budgets, qm_enabled=qm_enabled,
+                                 ml_enabled=ml_enabled, source=source)
+    if budgets is None:
+        raise ValueError("provisional traces require explicit budgets")
+    report = _evaluate_provisional(events, budgets=budgets,
+        qm_enabled=True if qm_enabled is None else qm_enabled,
+        ml_enabled=False if ml_enabled is None else ml_enabled, source=source)
+    enabled = report["metadata"]["qm_enabled"]
+    report["capabilities"] = {"qm_behavior": {
+        "status": "not_measurable" if not enabled else "available",
+        "label": "QM behavior: not measurable" if not enabled else "QM behavior: evaluated from supplied evidence",
+        "reason": "QM disabled" if not enabled else "Provisional per-item evidence; see findings"}}
+    return report
