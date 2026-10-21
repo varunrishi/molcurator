@@ -3,7 +3,7 @@ import pytest
 from rdkit import Chem
 
 from molcurator.chem import stoned
-from molcurator.chem.convert import canonical_smiles, is_implausible, selfies_to_smiles
+from molcurator.chem.convert import canonical_smiles, is_implausible, ring_profile, selfies_to_smiles
 from molcurator.schemas import GenerationSettings
 from molcurator.tools.generate import MAX_HEAVY_ATOMS, generate
 
@@ -39,6 +39,22 @@ def test_invalid_parent_and_unknown_generator_raise():
         generate(["not-a-smiles"], GenerationSettings(), 1, 0)
     with pytest.raises(ValueError):
         generate([SEED], GenerationSettings(generator="mol2mol"), 1, 0)
+
+
+def test_candidates_keep_the_parents_conjugation():
+    # Random SELFIES edits readily open a fused aromatic into a chain, which destroys the
+    # conjugation the target electronic property depends on. Such candidates are dropped.
+    for c in generate([SEED], GenerationSettings(n_candidates=50, mutation_strength=3), 1, 0):
+        rings, aromatic = ring_profile(c.smiles)
+        assert rings >= 1 and aromatic
+
+
+def test_an_aliphatic_parent_is_not_required_to_be_aromatic():
+    # The rule follows the parent: an aliphatic ring parent only has to keep a ring.
+    out = generate(["O=C1CCCCC1"], GenerationSettings(n_candidates=20), 1, 0)
+    assert len(out) == 20
+    assert all(ring_profile(c.smiles)[0] >= 1 for c in out)
+    assert not all(ring_profile(c.smiles)[1] for c in out)  # aromaticity is not forced
 
 
 def test_candidates_stay_close_in_size_to_the_parent():
