@@ -24,6 +24,12 @@ def preflight(backend='all', env_file=None):
             checks.append(dict(name=name, ok=True, detail=str(getattr(module, '__version__', 'import OK'))))
         except Exception as exc:
             checks.append(dict(name=name, ok=False, detail=f'{type(exc).__name__}: {exc}'))
+    try:
+        from molcurator_property_validation.chem.settings import load_settings
+        settings = load_settings()
+        checks.append(dict(name="chemistry settings", ok=True, detail=settings.model_dump()))
+    except Exception as exc:
+        checks.append(dict(name="chemistry settings", ok=False, detail=str(exc)))
     for name in (('xtb', 'orca') if backend == 'all' else (backend,)):
         key = name.upper() + '_BIN'
         value = os.environ.get(key) or name
@@ -35,13 +41,13 @@ def preflight(backend='all', env_file=None):
                 checks=checks, runtime_tested=False)
 
 
-def smoke(backend, output):
+def smoke(backend, output, resume=False):
     from molcurator.schemas import Candidate, Prediction, PropertyTarget, QMSettings, Status
     from molcurator.tools.predict import predict
     from molcurator.tools.validate import validate
     from molcurator_property_validation.chem.geometry import lowest_ff_conformer
     output = Path(output).resolve()
-    output.mkdir(parents=True, exist_ok=False)
+    output.mkdir(parents=True, exist_ok=resume)
     candidate = Candidate(id='ethanol', smiles='CCO', parent_smiles='CCO', round=1, generator='preflight')
     target = PropertyTarget(name='homo_lumo_gap', min=0)
     result = dict(backend=backend, predictions=[], qm_results=[], ok=False)
@@ -66,6 +72,10 @@ def smoke(backend, output):
     else:
         result['ok'] = predicted
     (output/'preflight-smoke.json').write_text(json.dumps(result, indent=2))
+    attempts = [json.loads(p.read_text()) for p in output.rglob("attempt.json") if p.parent.name in ("xtb", "orca")]
+    result["electronic_calls_attempted"] = sum(r.get("electronic_calls_attempted", 0) for r in attempts)
+    result["cache_hits"] = sum(r.get("cache_hit", False) for r in attempts)
+    (output/"preflight-smoke.json").write_text(json.dumps(result, indent=2))
     return result
 
 
@@ -75,15 +85,18 @@ def main():
     parser.add_argument('--env-file', type=Path, default=ROOT/'.env')
     parser.add_argument('--json', action='store_true')
     parser.add_argument('--smoke', action='store_true', help='run real chemistry on an allocated compute node')
-    parser.add_argument('--out', type=Path, help='new smoke output directory')
+    parser.add_argument('--resume', action='store_true', help='reuse valid successful results in an existing smoke directory')
+    parser.add_argument('--out', type=Path, help='smoke output directory (new unless --resume)')
     args = parser.parse_args()
     if args.smoke and args.out is None:
-        parser.error('--smoke requires --out with a new directory')
+        parser.error('--smoke requires --out')
+    if args.resume and not args.smoke:
+        parser.error('--resume requires --smoke')
     report = preflight(args.backend, args.env_file)
     if args.smoke and report['ok']:
         try:
-            report['smoke'] = smoke(args.backend, args.out)
-            report['runtime_tested'] = True
+            report['smoke'] = smoke(args.backend, args.out, args.resume)
+            report['runtime_tested'] = report['smoke'].get('electronic_calls_attempted', 1) > 0
             report['ok'] = report['smoke']['ok']
         except Exception as exc:
             report.update(ok=False, smoke_error=f'{type(exc).__name__}: {exc}')
@@ -93,7 +106,10 @@ def main():
         for item in report['checks']:
             print(f"[{'OK' if item['ok'] else 'FAIL'}] {item['name']}: {item['detail']}")
         if args.smoke:
-            print('Runtime smoke:', 'PASS' if report.get('smoke',{}).get('ok') else 'FAILED or not run')
+            print('Workflow smoke:', 'PASS' if report.get('smoke',{}).get('ok') else 'FAILED or not run')
+            if report.get('smoke'):
+                print('Launched electronic calls:', report['smoke'].get('electronic_calls_attempted', 'unknown'))
+                print('Cache hits:', report['smoke'].get('cache_hits', 0))
         else:
             print('No chemistry was run. Use --smoke --out NEW_DIR on a compute node to test runtime.')
     return 0 if report['ok'] else 1

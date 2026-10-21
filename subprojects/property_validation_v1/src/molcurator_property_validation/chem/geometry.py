@@ -6,8 +6,12 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
 
 
-def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.15):
+def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: float | None = None):
     """Select lowest converged FF minimum; weight unique sampled minima at 0.25 Å RMSD."""
+    from .settings import load_settings
+    settings = load_settings()
+    nconfs = settings.nconfs if nconfs is None else nconfs
+    temperature = settings.temperature_k if temperature is None else temperature
     if nconfs < 1 or not math.isfinite(temperature) or temperature <= 0:
         raise ValueError("positive conformer count and temperature required")
     mol = Chem.MolFromSmiles(smiles)
@@ -17,7 +21,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
         raise ValueError("iteration 1 supports neutral closed-shell molecules only")
     mol = Chem.AddHs(mol)
     params = AllChem.ETKDGv3()
-    params.randomSeed = 42
+    params.randomSeed = settings.random_seed
     params.numThreads = 1
     params.pruneRmsThresh = -1
     ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=nconfs, params=params))
@@ -26,8 +30,14 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
     if not AllChem.MMFFHasAllMoleculeParams(mol):
         raise ValueError("MMFF94 parameters unavailable; no alternative force field is used")
     method = "MMFF94"
-    results = AllChem.MMFFOptimizeMoleculeConfs(
-        mol, numThreads=1, maxIters=500, mmffVariant="MMFF94")
+    properties = AllChem.MMFFGetMoleculeProperties(mol, mmffVariant="MMFF94")
+    results = []
+    for cid in ids:
+        field = AllChem.MMFFGetMoleculeForceField(mol, properties, confId=cid)
+        status = field.Minimize(maxIts=settings.mmff_max_iterations,
+                                forceTol=settings.mmff_force_tolerance,
+                                energyTol=settings.mmff_energy_tolerance)
+        results.append((status, field.CalcEnergy()))
     minima = sorted((float(e), cid) for cid, (status, e) in zip(ids, results)
                     if status == 0 and math.isfinite(e))
     if not minima:
@@ -37,7 +47,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
     for energy, cid in minima:
         # Align copies so clustering cannot move the selected geometry.
         if all(rdMolAlign.GetBestRMS(Chem.Mol(heavy), Chem.Mol(heavy),
-                                    prbId=cid, refId=other, maxMatches=10000) >= 0.25
+                                    prbId=cid, refId=other, maxMatches=10000) >= settings.rms_cutoff_angstrom
                for _, other in unique):
             unique.append((energy, cid))
     energy, cid = unique[0]
@@ -49,7 +59,10 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
                   selected_ff_energy_kcal_mol=energy, selected_ff_boltzmann_weight=weight,
                   unique_ff_energies_kcal_mol=[e for e, _ in unique],
                   weight_scope="unique sampled converged FF minima; no energy-window truncation",
-                  rms_cutoff_angstrom=0.25, random_seed=42)
+                  rms_cutoff_angstrom=settings.rms_cutoff_angstrom, random_seed=settings.random_seed,
+                  n_requested=nconfs, mmff_max_iterations=settings.mmff_max_iterations,
+                  mmff_force_tolerance=settings.mmff_force_tolerance,
+                  mmff_energy_tolerance=settings.mmff_energy_tolerance)
     return Chem.MolToXYZBlock(mol, confId=cid), report
 
 
