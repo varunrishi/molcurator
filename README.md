@@ -174,7 +174,9 @@ summary.
 | `checkpoint.sqlite` | the agent state after every step, for `--resume` |
 
 **Current limits (v1):**
-- **Decisions use rules** (`decisions: rules` in the configs); the LLM decider is not built yet.
+- **Decisions use rules** (`decisions: rules` in the configs). Set `decisions: llm` to have Claude Haiku 4.5 plan
+  rounds, decide whether to continue and write the summary; it needs `ANTHROPIC_API_KEY` in `.env`, and the
+  rules take over whenever an answer is invalid or late.
 - **QM validation is off** (`qm.enabled: false`) and not yet wired into the agent.
 - **The real TRAIN tool is still a stub,** so a run stops at TRAIN once it has `train.min_examples`
   (200) xTB values. With the default 100 candidates per round, that's round 3.
