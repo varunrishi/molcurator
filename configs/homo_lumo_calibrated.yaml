@@ -1,0 +1,20 @@
+# Opt-in chemistry-stage config. Existing agent defaults are unchanged.
+target:
+  name: homo_lumo_gap
+  min: 3.0
+  max: 3.5
+  units: eV
+seeds:
+  - "CCO"  # Replace with the project's seed molecule.
+screening:
+  margin: 0.75  # Exploratory calibrated band, not a hard rejection threshold.
+qm:
+  backend: orca
+  functional: B3LYP
+  basis: def2-SVP
+budget:
+  max_rounds: 5
+  max_qm_calls: 20
+  target_dataset_size: 10
+decisions: rules
+rng_seed: 0

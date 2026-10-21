@@ -6,6 +6,12 @@
 **Shared branch:** `codex/calibrated-screening-v1`
 **Status:** Chemistry adapters and initial calibration are operational. Full agent integration and broader scientific validation remain in progress.
 
+### Configured agent-stage integration
+
+`molcurator.tools.chemistry.run_chemistry_round` reads the shared RunConfig, invokes real or injected PREDICT/VALIDATE tools, performs calibrated selection or calls an agent selector, reserves remaining QM capacity before dispatch, and prepares reference-confirmed CuratedEntry records. It saves per-round config/candidate/result/selection evidence and surfaces FF weights for summaries. The opt-in `configs/homo_lumo_calibrated.yaml` leaves existing defaults unchanged. Root dataset persistence and the complete graph remain external work. See [agent usage](docs/AGENT_CHEMISTRY_USAGE.md).
+
+Latest combined offline test suite: **55/55 passed**, including configured-stage integration and the team's fake-tool injection.
+
 ### What is implemented and operable
 
 | Component | Current capability | How to use it |
@@ -24,7 +30,7 @@ These are callable tools and research utilities. The complete `molcurator run` c
 
 ### Validation completed
 
-- Latest offline combined suite: **42/42 passed**. Tests cover adapters, failures, ID preservation, geometry handoff, calibration, exports, and viewer behavior. They use real RDKit sampling and simulated external process outputs.
+- Underlying adapter/ranking/export/viewer suite: **42/42 passed**; with configured-stage integration tests, **55/55 passed**. Tests cover adapters, failures, ID preservation, geometry handoff, calibration, exports, and viewer behavior. They use real RDKit sampling and simulated external process outputs.
 - Cluster documentation reports a successful real benzene smoke run: xTB gap **4.93426034 eV**, ORCA B3LYP/def2-SVP gap **6.84730000 eV**. Raw cluster logs were not re-audited during the local review.
 - Initial campaign reports **24 successful calculations**, with a fixed **16 training / 8 held-out** split. Held-out MAEs: raw **2.600 eV**, constant correction **0.695 eV**, linear correction **0.772 eV**.
 - Target-enriched campaign: **568 successful xTB screens from 600 candidates**, then **60 successful stratified ORCA validations**. Metrics independently reproduced from the committed 60-row CSV:
@@ -64,7 +70,7 @@ agent-generated Candidates
 
 ### What remains to be done
 
-1. Integrate tools/ranking into the agent with method matching, exploration, cumulative budgets, traces, checkpoint/resume, and a functional CLI.
+1. Wire the configured chemistry stage into the graph and functional CLI; persist cumulative budget debits, trace events, wall-time limits and checkpoint/resume state. Method matching, exploration, per-round budget reservation and prepared entries are available in the stage.
 2. Implement root GENERATE and idempotent CURATE; run one complete seed-to-dataset HOMO–LUMO demonstration.
 3. Add a persistent calculation cache keyed by molecular identity, geometry, method/settings and software provenance; preserve lifetime attempt counts.
 4. Investigate the 32 unsuccessful xTB screens and audit provenance, parser compatibility, and convergence for broader chemistry.
