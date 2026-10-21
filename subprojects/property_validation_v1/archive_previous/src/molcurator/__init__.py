@@ -1,0 +1,1 @@
+"""MolCurator hackathon reference implementation."""

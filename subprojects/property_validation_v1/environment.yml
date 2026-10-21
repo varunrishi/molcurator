@@ -1,0 +1,17 @@
+name: molcurator
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - rdkit
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - joblib
+  - pyyaml
+  - pytest
+  - pip
+  - pip:
+      - py3Dmol

@@ -1,0 +1,16 @@
+dataset,model,train_n,test_n,mae_ev,rmse_ev,r2
+original94,mean,75,19,1.060833,1.242570,-0.029282
+original94,morgan_rf,75,19,0.657133,0.787859,0.586201
+original94,xtb_rf,75,19,0.439066,0.624206,0.740254
+original94,combined_rf,75,19,0.424689,0.575146,0.779479
+original94,xtb_ridge,75,19,0.500670,0.586291,0.770851
+expanded,mean,257,19,1.080181,1.257062,-0.053430
+expanded,morgan_rf,257,19,0.581730,0.715438,0.658779
+expanded,xtb_rf,257,19,0.467830,0.642981,0.724394
+expanded,combined_rf,257,19,0.403487,0.570003,0.783406
+expanded,xtb_ridge,257,19,0.483231,0.567927,0.784981
+external48,mean,257,48,1.0959,1.3177,-0.1273
+external48,morgan_rf,257,48,0.7676,0.9890,0.3650
+external48,xtb_rf,257,48,0.4678,0.6184,0.7517
+external48,combined_rf,257,48,0.3946,0.5488,0.8044
+external48,xtb_ridge,257,48,0.8293,1.4234,-0.3153

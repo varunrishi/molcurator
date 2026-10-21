@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.env
+.vscode/
+*.joblib
+*.out
+*.gbw
+*.engrad
+*.hess
+*.tmp
+slurm-*.out
+logs/
+results/
+demo_data/
+.DS_Store

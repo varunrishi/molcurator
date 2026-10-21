@@ -153,3 +153,7 @@ assets/          logo and README images
 ## License
 
 See [LICENSE](LICENSE).
+
+## Property extraction and validation subproject
+
+The first research iteration lives in [subprojects/property_validation_v1](subprojects/property_validation_v1/README.md). It preserves the imported conformer, xTB/ORCA property extraction, and validation workflows with their own environment and documentation. It is not yet connected to the main agent tools. See its README for scope, reproduction limits, and provenance.

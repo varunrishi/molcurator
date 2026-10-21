@@ -1,0 +1,17 @@
+# Never commit QC calculations, models or cluster credentials
+config.env
+.env
+*.joblib
+*.out
+*.gbw
+*.densities
+*.tmp
+*.log
+__pycache__/
+.pytest_cache/
+.DS_Store
+work/
+runs/
+outputs/
+*.xyz
+*.sdf
