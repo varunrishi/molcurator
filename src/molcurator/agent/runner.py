@@ -1,5 +1,6 @@
 """Starting runs: the run folder, run_agent() and (later) resume_agent() (Phase 2, R8.1, R8.4)."""
 import secrets
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,7 +24,8 @@ def create_run_dir(config: RunConfig, runs_root: str | Path = "data/runs", run_i
 
 
 def run_agent(config: RunConfig, tools: Toolset | None = None, decider: Decider | None = None,
-              runs_root: str | Path = "data/runs", run_id: str | None = None) -> dict:
+              runs_root: str | Path = "data/runs", run_id: str | None = None,
+              on_event: Callable[[dict], None] | None = None) -> dict:
     """Run the agent in a new run folder and return the final state (R8.1, R8.4).
     Real tools and the config's decision mode by default; tests pass fakes."""
     if decider is None:
@@ -31,7 +33,7 @@ def run_agent(config: RunConfig, tools: Toolset | None = None, decider: Decider 
             raise NotImplementedError("the LLM decider is not built yet (Phase 2 step 8); set decisions: rules")
         decider = RuleDecider()
     run_dir = create_run_dir(config, runs_root, run_id)
-    trace = TraceWriter(run_dir, run_dir.name)
+    trace = TraceWriter(run_dir, run_dir.name, on_event)
     write_run_start(trace, config, NODES)
     graph = build_graph(config, tools or Toolset.default(), decider, trace=trace)
     steps = (len(NODES) - 1) * config.budget.max_rounds + 2  # every node per round, plus WRITE SUMMARY

@@ -15,9 +15,10 @@ SKIP_REASONS = {"train": "below_min_examples", "ml_predict": "no_candidates_left
 class TraceWriter:
     """Appends trace events; every line carries the same identifying keys (R6.1)."""
 
-    def __init__(self, run_dir: str | Path, run_id: str):
+    def __init__(self, run_dir: str | Path, run_id: str, on_event: Callable[[dict], None] | None = None):
         self.path = Path(run_dir) / "traces" / "trace.jsonl"
         self.run_id = run_id
+        self.on_event = on_event  # e.g. live progress (R8.3); called after the line is safely written
 
     def write(self, node: str, round: int | None, **fields) -> dict:
         """Append one event and return it; round None marks a run-level event such as run_start."""
@@ -27,6 +28,8 @@ class TraceWriter:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a") as f:  # one open per line: a crash loses at most the line being written
             f.write(json.dumps(event, default=str) + "\n")
+        if self.on_event:
+            self.on_event(event)
         return event
 
 
