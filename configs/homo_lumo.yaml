@@ -1,11 +1,19 @@
-# Use case 1: molecules with a HOMO-LUMO gap in a target range.
-#
-# Planned keys:
-#   seed_smiles:        seed molecule (or path to a file in data/seeds/)
-#   target:             property name, min / max values, units (eV)
-#   generator:          stoned_selfies | mol2mol, number of candidates per round
-#   screening:          uncertainty threshold for sending candidates to VALIDATE
-#   qm:                 backend (pyscf | orca), functional, basis set
-#   budget:             max iterations, max QM calls, target dataset size
-#   llm:                optional overrides of LLM_MODEL / LLM_BASE_URL from .env,
-#                       temperature, max agent steps
+# Use case 1: molecules with a HOMO-LUMO gap in a target window (eV), judged at the QM level.
+# Read by molcurator.config.load_config; anything omitted uses the defaults in config.py.
+target:
+  name: homo_lumo_gap
+  min: 3.0
+  max: 3.5
+seeds:
+  - "c1ccc(-c2cccs2)s1"  # PLACEHOLDER: 2,2'-bithiophene; replace with the real seed molecule
+screening:
+  margin: 0.2  # xTB screen accepts 2.8-3.7 eV (xTB is systematically offset from QM)
+qm:
+  backend: orca
+  functional: B3LYP
+  basis: def2-SVP
+budget:
+  max_rounds: 5
+  max_qm_calls: 20
+  target_dataset_size: 10
+decisions: llm  # "rules" for fast runs without an LLM

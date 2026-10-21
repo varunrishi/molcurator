@@ -4,6 +4,8 @@
 
 MolCurator is an AI agent that, given a seed molecule and a desired molecular property, generates, screens, validates and curates a benchmark set of molecules that have that property.
 
+The workflow is a fixed, deterministic sequence of tool steps (a LangGraph graph). A fast language model, Claude Haiku 4.5 by default, makes the judgement calls inside it: how to generate each round, which candidates deserve expensive quantum chemistry, when to stop, and how to summarise the run. Each decision has a rule-based fallback, so a run also works without any LLM.
+
 ## Problem
 
 Building molecular benchmark sets and designing molecules with precisely tuned properties (e.g. a narrow HOMO-LUMO gap window, or a near-zero S1-T1 gap for TADF emitters) takes a lot of manual work: generating candidates, running cheap screens, choosing which candidates deserve expensive quantum chemistry, and keeping the results consistent. MolCurator automates this loop.
@@ -19,9 +21,10 @@ Building molecular benchmark sets and designing molecules with precisely tuned p
 1. **Generate** candidate molecules from a seed molecule (Mol2Mol / REINVENT4 or STONED SELFIES, with RDKit).
 2. **Predict** properties cheaply (SMILES → 3D geometry → xTB optimisation → property extraction) and with ML models (ChemProp), including uncertainty.
 3. **Train** and retrain the ML model on the growing dataset.
-4. **Validate** promising candidates, chosen by uncertainty, with more accurate quantum chemistry (PySCF / ORCA).
+4. **Validate** promising candidates, chosen by uncertainty, with more accurate quantum chemistry (ORCA by default, or PySCF).
 5. **Curate** verified molecules with SMILES, 3D structure and properties at several levels of methodology.
 6. **Evaluate** the agent's trajectories and tool calls.
+7. **Decide** at fixed points in the workflow with an LLM (Claude Haiku 4.5, ~2 s per decision) or with rules (<1 ms), selectable per run.
 
 ## Success criteria
 

@@ -1,4 +1,18 @@
-# Use case 2: candidate TADF emitters with an S1-T1 gap close to zero.
-#
-# Same keys as homo_lumo.yaml; the target is the S1-T1 energy gap (eV) below a threshold,
-# and the QM step uses TD-DFT for the S1 and T1 excitation energies.
+# Use case 2: candidate TADF emitters, i.e. a small singlet-triplet gap (S1 - T1, eV) at the QM level.
+# Read by molcurator.config.load_config; anything omitted uses the defaults in config.py.
+target:
+  name: s1_t1_gap
+  max: 0.2  # one-sided: no minimum, so S1 below T1 (inverted gap) also counts
+seeds:
+  - "N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1"  # PLACEHOLDER: carbazole-benzonitrile donor-acceptor; replace
+screening:
+  margin: 0.15  # xTB-level estimate (e.g. sTDA-xTB) accepted up to 0.35 eV
+qm:
+  backend: orca
+  functional: PBE0  # TD-DFT for S1 and T1
+  basis: def2-SVP
+budget:
+  max_rounds: 5
+  max_qm_calls: 10  # TD-DFT costs more per molecule than ground-state DFT
+  target_dataset_size: 5
+decisions: llm  # "rules" for fast runs without an LLM

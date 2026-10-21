@@ -226,6 +226,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiosqlite"
+version = "0.22.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/8a/64761f4005f17809769d23e518d915db74e6310474e733e3593cfc854ef1/aiosqlite-0.22.1.tar.gz", hash = "sha256:043e0bd78d32888c0a9ca90fc788b38796843360c855a7262a532813133a0650", size = 14821, upload-time = "2025-12-23T19:25:43.997Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/b7/e3bf5133d697a08128598c8d0abc5e16377b51465a33756de24fa7dee953/aiosqlite-0.22.1-py3-none-any.whl", hash = "sha256:21c002eb13823fad740196c5a2e9d8e62f6243bd9e7e4a1f87fb5e44ecb4fceb", size = 17405, upload-time = "2025-12-23T19:25:42.139Z" },
+]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.5"
 source = { registry = "https://pypi.org/simple" }
@@ -241,6 +250,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5f/56/a8120250d128bed162cd73c76d45f6ef9991f3e068f62a8ee060afa3104a/annotated_types-0.8.0.tar.gz", hash = "sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7", size = 15893, upload-time = "2026-07-23T20:16:13.995Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl", hash = "sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0", size = 13427, upload-time = "2026-07-23T20:16:12.938Z" },
+]
+
+[[package]]
+name = "anthropic"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "docstring-parser" },
+    { name = "httpx2" },
+    { name = "jiter" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/66/4ec271f7607460005276bb09b0d1c749a9ed0cead35a488a8676f15ed6d5/anthropic-1.17.0.tar.gz", hash = "sha256:dcf77a74dde89a9fd12405fca798b012725a107f7c9488454234a74e275c2163", size = 1756371, upload-time = "2026-10-20T22:13:35.117Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/9d/b4d4e46ec05bf19bcfd46c1417337e7cf42b9ecb95c3c63f295e2e9fee4b/anthropic-1.17.0-py3-none-any.whl", hash = "sha256:ccb98b85e1a14f81cf1e2ba348393f341f342bad9e07e014f96c9b69f853aaa7", size = 2094718, upload-time = "2026-10-20T22:13:32.585Z" },
 ]
 
 [[package]]
@@ -961,6 +989,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.18.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/4d/f332313098c1de1b2d2ff91cf2674415cc7cddab2ca1b01ae29774bd5fdf/docstring_parser-0.18.0.tar.gz", hash = "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015", size = 29341, upload-time = "2026-04-14T04:09:19.867Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/5f/ed01f9a3cdffbd5a008556fc7b2a08ddb1cc6ace7effa7340604b1d16699/docstring_parser-0.18.0-py3-none-any.whl", hash = "sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b", size = 22484, upload-time = "2026-04-14T04:09:18.638Z" },
 ]
 
 [[package]]
@@ -1861,6 +1898,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langgraph-checkpoint-sqlite"
+version = "3.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiosqlite" },
+    { name = "langgraph-checkpoint" },
+    { name = "sqlite-vec" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ee/df/082bb3b2b6f775402046fcdf1e3adfa9cd462846145ab504a76abc52c657/langgraph_checkpoint_sqlite-3.1.2.tar.gz", hash = "sha256:4e3f376fa6f192d6ad2a1a4643b039986f1593552ef870e9e45281575de6fbf2", size = 151160, upload-time = "2026-10-12T22:54:31.54Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/92/3fd8417a00bd41c40ca586e8f534daaf2c09e80ae891a93552f39ac31538/langgraph_checkpoint_sqlite-3.1.2-py3-none-any.whl", hash = "sha256:249640b84efd4872585a9ce596a63c2593e543f748341791591aeaf4c878329c", size = 41844, upload-time = "2026-10-12T22:54:30.429Z" },
+]
+
+[[package]]
 name = "langgraph-prebuilt"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2141,10 +2192,12 @@ name = "molcurator"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "chemprop" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
     { name = "langgraph" },
+    { name = "langgraph-checkpoint-sqlite" },
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "pandas", version = "3.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14' or platform_machine != 'x86_64' or sys_platform != 'darwin'" },
@@ -2154,6 +2207,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rdkit", version = "2025.9.3", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "rdkit", version = "2026.3.6", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "rich" },
     { name = "selfies" },
     { name = "typer" },
 ]
@@ -2167,10 +2221,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=1.17" },
     { name = "chemprop", specifier = ">=2.0" },
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=1.0" },
     { name = "langgraph", specifier = ">=0.2" },
+    { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1" },
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<2" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.0" },
@@ -2179,6 +2235,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rdkit", specifier = ">=2024.3" },
     { name = "rdkit", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<2026" },
+    { name = "rich", specifier = ">=13" },
     { name = "selfies", specifier = ">=2.1" },
     { name = "typer", specifier = ">=0.12" },
 ]
@@ -2836,6 +2893,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/87/4c/609b16f2a6e9a99f27a82ce93ff75868e7cb364fe6daff50cc0c1d620772/openai-3.35.1.tar.gz", hash = "sha256:b33e6561b90586e450def8a388e7d364755325da6884fc71348be5542e043bd0", size = 2250942, upload-time = "2026-10-18T01:06:38.964Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/22/7b/6d7e70f0762d1b286051bd7cb2fd0c364c1830d0f8826738673aeec05c2b/openai-3.35.1-py3-none-any.whl", hash = "sha256:264fd0fafc889021f526b7c1e5a2df5ca3e8dea874738ecd31da666434f25967", size = 2280230, upload-time = "2026-10-18T01:06:36.16Z" },
+]
+
+[[package]]
+name = "opentelemetry-api"
+version = "1.45.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/02/6e0ae9cc61bd3169d401077b507b3ebc344745171e1051ab430be012dcd9/opentelemetry_api-1.45.1.tar.gz", hash = "sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75", size = 72804, upload-time = "2026-10-06T17:32:58.133Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl", hash = "sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb", size = 60256, upload-time = "2026-10-06T17:32:33.506Z" },
 ]
 
 [[package]]
@@ -4491,6 +4560,18 @@ resolution-markers = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/77/2dcfa996b01702ab8fd0763d84098f6a640d6162a328f1c04c2697579a1a/soupsieve-3.0.3.tar.gz", hash = "sha256:7dcf6022eed0399eb9934a75e020148f7a2024c37b7dfcd3cf2c5505d69c364e", size = 115923, upload-time = "2026-10-12T13:21:17.696Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/ca/f639c80449997b88aba7bc9705d25dd76cc0844f45f187862fd8f8bb18fa/soupsieve-3.0.3-py3-none-any.whl", hash = "sha256:fa30e3ba4809cb81ce1f3209f2fbe3e779fc445f0439bc147a0d7c4601743f21", size = 41705, upload-time = "2026-10-12T13:21:16.474Z" },
+]
+
+[[package]]
+name = "sqlite-vec"
+version = "0.1.9"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/85/9fad0045d8e7c8df3e0fa5a56c630e8e15ad6e5ca2e6106fceb666aa6638/sqlite_vec-0.1.9-py3-none-macosx_10_6_x86_64.whl", hash = "sha256:1b62a7f0a060d9475575d4e599bbf94a13d85af896bc1ce86ee80d1b5b48e5fb", size = 131171, upload-time = "2026-03-31T08:02:31.717Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/3d/3677e0cd2f92e5ebc43cd29fbf565b75582bff1ccfa0b8327c7508e1084f/sqlite_vec-0.1.9-py3-none-macosx_11_0_arm64.whl", hash = "sha256:1d52e30513bae4cc9778ddbf6145610434081be4c3afe57cd877893bad9f6b6c", size = 165434, upload-time = "2026-03-31T08:02:32.712Z" },
+    { url = "https://files.pythonhosted.org/packages/00/d4/f2b936d3bdc38eadcbd2a87875815db36430fab0363182ba5d12cd8e0b51/sqlite_vec-0.1.9-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4e921e592f24a5f9a18f590b6ddd530eb637e2d474e3b1972f9bbeb773aa3cb9", size = 160076, upload-time = "2026-03-31T08:02:33.796Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/ad/6afd073b0f817b3e03f9e37ad626ae341805891f23c74b5292818f49ac63/sqlite_vec-0.1.9-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux1_x86_64.whl", hash = "sha256:1515727990b49e79bcaf75fdee2ffc7d461f8b66905013231251f1c8938e7786", size = 163388, upload-time = "2026-03-31T08:02:34.888Z" },
+    { url = "https://files.pythonhosted.org/packages/42/89/81b2907cda14e566b9bf215e2ad82fc9b349edf07d2010756ffdb902f328/sqlite_vec-0.1.9-py3-none-win_amd64.whl", hash = "sha256:4a28dc12fa4b53d7b1dced22da2488fade444e96b5d16fd2d698cd670675cf32", size = 292804, upload-time = "2026-03-31T08:02:36.035Z" },
 ]
 
 [[package]]
