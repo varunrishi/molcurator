@@ -68,3 +68,11 @@ Each electronic backend runs once per eligible selected molecule. Conformer
 generation and MMFF94 optimizations do not count as electronic calculations.
 ORCA validation reuses the selected geometry returned by PREDICT. The ORCA-only
 smoke test prepares the MMFF94 geometry directly without requiring xTB.
+
+
+## Configurable chemistry and restart
+
+See [Chemistry settings and calculation restart](CHEMISTRY_SETTINGS_AND_RESTART.md)
+for the follow-up configuration, durable attempt records, cache validation and
+`--resume` smoke option. Settings retain the defaults described above but can now
+override conformer preparation, MMFF convergence, temperature and ORCA resources.
