@@ -1,0 +1,17 @@
+{
+  "project_dir": "/home/USERNAME/molcurator-property-test",
+  "input": "/home/USERNAME/generated_smiles.csv",
+  "out": "/work/GROUP/molcurator/generated-001",
+  "python": ".venv/bin/python",
+  "job_name": "mc-properties",
+  "partition": "short",
+  "cpus_per_task": 1,
+  "memory_mb": 4096,
+  "time": "01:00:00",
+  "modules": [],
+  "chemistry_config": "/home/USERNAME/molcurator-property-test/chemistry.json",
+  "xtb_bin": "/absolute/cluster/path/to/xtb",
+  "orca": false,
+  "resume": false,
+  "plots": true
+}
