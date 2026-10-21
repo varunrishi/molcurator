@@ -14,9 +14,11 @@ from molcurator.agent.budgets import budget_stop_reason
 from molcurator.agent.decisions import Decider
 from molcurator.agent.state import AgentState
 from molcurator.agent.toolset import Toolset
+from molcurator.agent.trace import RecordingDecider, TraceWriter, traced
 from molcurator.config import RunConfig
 
 TOOL_STEPS = ["generate", "predict", "train", "ml_predict", "screen", "curate", "close_round"]  # v1 order, QM off
+NODES = ["plan_round", *TOOL_STEPS, "continue_or_stop", "write_summary"]  # for the run_start line (#13)
 
 
 def initial_state(run_id: str, run_dir: str | Path) -> AgentState:
@@ -71,16 +73,21 @@ def bind(fn: Callable, *extra) -> Callable[[AgentState], dict]:
     return lambda state: fn(state, *extra)
 
 
-def build_graph(config: RunConfig, tools: Toolset, decider: Decider, checkpointer=None):
-    """The v1 round loop: PLAN ROUND -> tool steps -> CONTINUE OR STOP -> next round or WRITE SUMMARY."""
+def build_graph(config: RunConfig, tools: Toolset, decider: Decider, checkpointer=None,
+                trace: TraceWriter | None = None):
+    """The v1 round loop: PLAN ROUND -> tool steps -> CONTINUE OR STOP -> next round or WRITE SUMMARY.
+    With a trace writer, every node writes one trace line when it finishes (R6.1, R6.2)."""
     if config.qm.enabled:
         raise NotImplementedError("QM steps are not wired into the v1 graph; set qm.enabled: false")
+    recorder = RecordingDecider(decider) if trace else decider
+    def add(name, node, decision=False):  # tracing wraps outside guarded, so a crash still gets a line
+        g.add_node(name, traced(name, node, trace, recorder if decision else None) if trace else node)
     g = StateGraph(AgentState)
-    g.add_node("plan_round", bind(plan_round_node, config, decider))
+    add("plan_round", bind(plan_round_node, config, recorder), decision=True)
     for name in TOOL_STEPS:
-        g.add_node(name, guarded(name, bind(getattr(nodes, f"{name}_node"), config, tools)))
-    g.add_node("continue_or_stop", bind(continue_or_stop_node, config, decider))
-    g.add_node("write_summary", bind(write_summary_node, config, decider))
+        add(name, guarded(name, bind(getattr(nodes, f"{name}_node"), config, tools)))
+    add("continue_or_stop", bind(continue_or_stop_node, config, recorder), decision=True)
+    add("write_summary", bind(write_summary_node, config, recorder), decision=True)
     g.add_edge(START, "plan_round")
     g.add_edge("plan_round", TOOL_STEPS[0])
     for name, nxt in zip(TOOL_STEPS, [*TOOL_STEPS[1:], "continue_or_stop"]):  # a crashed step ends the run (R1.7)

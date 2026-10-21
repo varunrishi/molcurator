@@ -2,8 +2,9 @@
 from pathlib import Path
 
 from molcurator.agent.decisions import RuleDecider
-from molcurator.agent.graph import build_graph, initial_state
+from molcurator.agent.graph import NODES, build_graph, initial_state
 from molcurator.agent.toolset import Toolset
+from molcurator.agent.trace import TraceWriter, write_run_start
 from molcurator.config import RunConfig, load_config
 from tests.agent.fakes import FakeTools
 
@@ -17,7 +18,9 @@ def run_graph(tmp_path, tools: FakeTools | None = None, n_candidates: int | None
     if n_candidates is not None:
         data["generation"]["defaults"]["n_candidates"] = n_candidates
     config = RunConfig.model_validate(data)
-    graph = build_graph(config, Toolset.from_object(tools or FakeTools()), RuleDecider())
+    trace = TraceWriter(tmp_path, "test")  # every test run is traced, as the runner will do (R6.1)
+    write_run_start(trace, config, NODES)
+    graph = build_graph(config, Toolset.from_object(tools or FakeTools()), RuleDecider(), trace=trace)
     # 9 nodes per round plus WRITE SUMMARY; a wrongly looping graph fails instead of hanging
     return graph.invoke(initial_state("test", tmp_path), {"recursion_limit": 9 * config.budget.max_rounds + 2})
 
