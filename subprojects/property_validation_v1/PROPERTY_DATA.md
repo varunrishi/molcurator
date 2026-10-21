@@ -20,6 +20,8 @@ Keep the datasets separate for method-specific calibration, errors and training 
 - FF fields: force-field method, energy in kcal/mol, sampled-set Boltzmann weight, temperature in K, and unique conformer count. The weight is conditional on sampled FF minima, not an experimental population.
 - `selection_probability`, `stratum`: stratified B3LYP sample design metadata. Preserve these when estimating screening-pool metrics; unweighted cohort metrics are not population metrics.
 
+The 60 B3LYP records have status `ok`; the 276 historical PBE0 records have blank status. Do not interpret a blank status as confirmed success or failure. Audit the historical labels and source calculations before reuse.
+
 Blank cells mean unavailable values, never zero. Check `status` and required columns before analysis. Original calculation software, geometry policies and source campaigns may differ; inspect the provenance rather than assuming one common protocol for all 336 rows. Paths in `source_csv` identify original export artifacts and are not necessarily files included by this small data PR.
 
 ## Example reuse
@@ -29,7 +31,8 @@ import pandas as pd
 
 df = pd.read_csv('subprojects/property_validation_v1/molcurator_properties_for_collaborators.csv')
 b3lyp = df[(df.dataset == 'b3lyp_validation60') & (df.status == 'ok')]
-pbe0 = df[(df.dataset == 'historical_pbe0_276') & (df.status == 'ok')]
+pbe0 = df[(df.dataset == 'historical_pbe0_276') & df.orca_gap_ev.notna()]
+# PBE0 status is unavailable; a present label alone does not confirm convergence.
 # Select reference-method-compatible labels and split by molecular identity
 # before fitting or evaluating a model. Keep held-out molecules out of training.
 ```
