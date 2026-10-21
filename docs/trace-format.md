@@ -22,7 +22,7 @@ readers.
 |---|---|---|
 | `trace_version` | int | `1` |
 | `run_id` | str | the run's id |
-| `event_id` | str | `<run_id>:r<round>:<node>`, or `<run_id>:<node>` for run-level events (`run_start`) |
+| `event_id` | str | `<run_id>:r<round>:<node>`, or `<run_id>:<node>` for run-level events (`run_start`); a resumed run's `run_start` is `<run_id>:run_start:resume-<n>` |
 | `node` | str | node name, see below |
 | `round` | int or null | round the node ran in, from 1; `null` for `run_start` |
 | `started_at`, `ended_at` | str | ISO 8601 UTC |
@@ -49,6 +49,8 @@ write_summary                                                                   
   the round does not run.
 - `run_start.inputs.nodes` lists the node order of the graph that actually ran. Check against it
   rather than a hard-coded list.
+- A resumed run adds a `run_start` line (with `resumed: true`) between two node lines, then
+  continues with the node that was interrupted. See **Resume** below.
 
 ## Statuses
 
@@ -124,14 +126,27 @@ skipped steps: with `qm.enabled: false` there are no QM lines; `train.min_exampl
 skipped TRAIN; `predict.n_xtb` bounds PREDICT's sample; `budget` holds the limits. `resumed` is
 `false` for a new run.
 
+## Resume
+
+`molcurator run --resume <run_id>` continues an interrupted run (Ctrl-C, a killed process) from its
+last finished node, using the run's saved `config.yaml`.
+
+- It first writes a `run_start` line with `resumed: true` and the id
+  `<run_id>:run_start:resume-<n>` (`resume-1` for the first resume, `resume-2` for the next, ...).
+- The node that was interrupted wrote no line (lines are written when a node finishes), so it runs
+  again and writes its line once.
+- A node never writes a second line: if a run was killed after a node wrote its line but before the
+  state was saved, the repeated node's line is skipped. Every `event_id` stays unique.
+- Time spent stopped does not count against `budget.max_wall_time`: only running time does.
+- A run that already reached `write_summary` (including one ended by a failed step) cannot be
+  resumed.
+
 ## Not in v1
 
 - QM nodes (`select_qm_batch`, `approve_qm`, `validate`) and their lines.
 - Per-item `electronic_calls_attempted` / `cache_hit` for VALIDATE: needs a tool-contract change.
   The agent caches nothing, so QM calls equal the batch size (`round_stats.qm_calls`).
 - `provider` and `model` in the `llm` block (with the LLM decider).
-- Resume: a resumed run writes `run_start` again with `resumed: true`; its `event_id` scheme is
-  still to be settled.
 
 ## Example
 

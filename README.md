@@ -155,6 +155,8 @@ Run 20261021-201525-7864 stopped: target_dataset_size. Dataset size: 28.
 Options:
 - `--run-id <name>` names the run folder. An existing run is never overwritten.
 - `--runs-root <dir>` changes where run folders go (default `data/runs`).
+- `--resume <run_id>` continues an interrupted run (e.g. stopped with Ctrl-C) from its last finished
+  step, using the run's saved config. Time spent stopped does not count against `max_wall_time`.
 
 The command exits with code 1 if a step crashed. The error is printed and saved in the trace and
 summary.
@@ -169,6 +171,7 @@ summary.
 | `traces/trace.jsonl` | one JSON line per step; see [`docs/trace-format.md`](docs/trace-format.md) |
 | `summary.md` | a short report of the run and why it stopped |
 | `config.yaml` | the exact settings the run used |
+| `checkpoint.sqlite` | the agent state after every step, for `--resume` |
 
 **Current limits (v1):**
 - **Decisions use rules** (`decisions: rules` in the configs); the LLM decider is not built yet.

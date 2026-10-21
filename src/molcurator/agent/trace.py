@@ -19,12 +19,21 @@ class TraceWriter:
         self.path = Path(run_dir) / "traces" / "trace.jsonl"
         self.run_id = run_id
         self.on_event = on_event  # e.g. live progress (R8.3); called after the line is safely written
+        # On resume: ids already written. A node killed after writing its line but before its checkpoint
+        # was saved runs again, and must not write a second line (R7.2).
+        lines = self.path.read_text().splitlines() if self.path.exists() else []
+        self.written = {json.loads(line)["event_id"] for line in lines}
 
     def write(self, node: str, round: int | None, **fields) -> dict:
         """Append one event and return it; round None marks a run-level event such as run_start."""
         event_id = f"{self.run_id}:{node}" if round is None else f"{self.run_id}:r{round}:{node}"
+        if node == "run_start" and event_id in self.written:  # a resume: number it, so ids stay unique (#13)
+            event_id += f":resume-{sum(i.startswith(event_id) for i in self.written)}"
         event = {"trace_version": TRACE_VERSION, "run_id": self.run_id, "event_id": event_id,
                  "node": node, "round": round, **fields}
+        if event_id in self.written:
+            return event  # already in the trace: skipped, and not reported to progress again
+        self.written.add(event_id)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a") as f:  # one open per line: a crash loses at most the line being written
             f.write(json.dumps(event, default=str) + "\n")
