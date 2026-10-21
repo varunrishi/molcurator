@@ -202,6 +202,15 @@ Add `anthropic` (1.17.0 resolves here), `langgraph-checkpoint-sqlite` (3.1.2) an
    `model`, new statuses), `Toolset` fields, the xTB random sample in PREDICT, the TRAIN and
    ML PREDICT nodes, SCREEN on the best estimate with `unscored`, CURATE on the best estimate
    with the `validated` flag. — R2.1, R2.2, R10.1–R10.5, R11.1–R11.3
+
+   **v1 scope (2026-10-21):** the first version runs sequentially on the existing rules
+   (`decisions: rules`) with QM off: SEED → GENERATE → PREDICT → TRAIN → ML PREDICT → SCREEN →
+   CURATE, repeating rounds until `target_dataset_size` (or another budget) is reached.
+
+   **Known limitation, QM on:** ML-only molecules have no geometry, so if one is picked for the QM
+   batch, VALIDATE fails (QM needs a starting geometry). Parked fix ("option A"): at the start of
+   VALIDATE, run xTB (`tools.predict`) on batch molecules without a geometry, drop those whose xTB
+   fails from the batch, then validate as usual. No contract change needed.
 7. **Graph:** `build_graph`, routing, budget-guarded loop, error route to summary; first
    end-to-end run with fakes and rules. — R1.1, R1.7, R4.3, R4.4
 8. **LLM decisions:** `summaries.py`, `prompts.py`, `LLMDecider` (Anthropic, then OpenAI

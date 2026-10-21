@@ -5,8 +5,8 @@ geometries stay on disk and only their paths are kept. No LLM message history is
 """
 from typing import Literal, TypedDict
 
-MoleculeStatus = Literal["generated", "duplicate", "predicted", "failed", "screened_in",
-                         "screened_out", "selected", "validated", "curated"]
+MoleculeStatus = Literal["generated", "duplicate", "predicted", "ml_predicted", "unscored", "failed",
+                         "screened_in", "screened_out", "selected", "validated", "curated"]
 
 
 class MoleculeRecord(TypedDict):
@@ -18,6 +18,7 @@ class MoleculeRecord(TypedDict):
     parent: str  # SMILES it was generated from
     status: MoleculeStatus
     xtb: float | None  # PREDICT value
+    ml: float | None  # ML PREDICT estimate (R10.4)
     qm: float | None  # VALIDATE value
     qm_method: str | None  # level of theory named by VALIDATE, e.g. "dft:B3LYP/def2-SVP"; CURATE's key
     xyz_path: str | None  # a str, not a Path, so checkpoints hold plain data
@@ -30,6 +31,9 @@ class RoundStats(TypedDict):
     round: int
     generated: int
     duplicates: int  # skipped, already seen in the run (R1.5)
+    xtb_runs: int  # molecules sent to xTB this round (the random sample, R10.1)
+    ml_predicted: int  # molecules scored by the ML model (R10.4)
+    unscored: int  # left without any estimate: no xTB value and no model yet (R10.5)
     failed: int  # failed in any tool step (R1.6)
     screened_in: int  # passed the xTB screen (R1.4)
     selected: int  # chosen for QM
@@ -45,6 +49,7 @@ class AgentState(TypedDict):
     round: int  # current round, starting at 1
     molecules: dict[str, MoleculeRecord]  # by id; seen SMILES are derived from these + seeds (R1.5)
     round_plan: dict | None  # this round's plan decision (RoundPlan.model_dump()), plain data
+    model: dict | None  # latest TrainResult (model_dump()), plain data; None until TRAIN first runs (R10.3)
     qm_batch: list[str]  # ids chosen for VALIDATE this round
     dataset_size: int  # as returned by CURATE
     round_stats: list[RoundStats]  # one per finished round; QM calls used = sum of qm_calls

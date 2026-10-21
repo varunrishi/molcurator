@@ -12,11 +12,19 @@ def target_distance(value: float, target: PropertyTarget) -> float:
     return max(below, above, 0.0)
 
 
+def best_estimate(m: MoleculeRecord) -> float | None:
+    """The most accurate value a molecule has: QM, else xTB, else ML (R1.4, R11.2)."""
+    for level in ("qm", "xtb", "ml"):
+        if m[level] is not None:
+            return m[level]
+    return None
+
+
 def parent_options(state: AgentState, config: RunConfig) -> dict[str, str]:
     """Molecules the plan-round decision may mutate, id -> SMILES: seeds, curated, then best xTB."""
     options = {f"seed-{i}": smiles for i, smiles in enumerate(config.seeds)}
-    scored = [m for m in state["molecules"].values() if m["xtb"] is not None]
-    scored.sort(key=lambda m: (m["status"] != "curated", target_distance(m["xtb"], config.target)))
+    scored = [m for m in state["molecules"].values() if best_estimate(m) is not None]
+    scored.sort(key=lambda m: (m["status"] != "curated", target_distance(best_estimate(m), config.target)))
     for m in scored[: max(config.llm.max_table_rows - len(options), 0)]:
         options[m["id"]] = m["smiles"]
     return options
@@ -28,5 +36,5 @@ def screened_candidates(state: AgentState, config: RunConfig) -> list[MoleculeRe
     Ties are broken by id, so seeded runs and resumes see exactly the same order.
     """
     pool = [m for m in state["molecules"].values() if m["status"] == "screened_in"]
-    pool.sort(key=lambda m: (target_distance(m["xtb"], config.target), m["id"]))
+    pool.sort(key=lambda m: (target_distance(best_estimate(m), config.target), m["id"]))
     return pool[: config.llm.max_table_rows]

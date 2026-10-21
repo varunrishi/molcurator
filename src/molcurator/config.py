@@ -45,6 +45,20 @@ class LLMSettings(BaseModel):
     max_table_rows: int = Field(default=20, ge=1)  # candidates shown to the QM-batch decision (R3.2)
 
 
+class PredictSettings(BaseModel):
+    n_xtb: int = Field(default=200, ge=1)  # xTB on a random sample of this many new candidates per round (R10.1)
+
+
+class TrainSettings(BaseModel):
+    min_examples: int = Field(default=200, ge=1)  # train once this many molecules have xTB values (R10.2)
+
+
+class QMConfig(QMSettings):
+    """The contract's QM settings plus whether to run QM at all; validate() still gets QMSettings fields."""
+
+    enabled: bool = False  # QM is slow, so the agent skips it unless a config turns it on (R11.1)
+
+
 class RunConfig(BaseModel):
     """One run: what to look for, where to start, and the limits (configs/<use case>.yaml)."""
 
@@ -52,7 +66,9 @@ class RunConfig(BaseModel):
     seeds: list[str] = Field(min_length=1)  # starting SMILES for round 1 (R1.3)
     generation: GenerationLimits = GenerationLimits()
     screening: ScreeningSettings = ScreeningSettings()
-    qm: QMSettings = QMSettings()  # ORCA by default
+    predict: PredictSettings = PredictSettings()
+    train: TrainSettings = TrainSettings()
+    qm: QMConfig = QMConfig()  # ORCA by default; off unless enabled
     budget: BudgetSettings = BudgetSettings()
     decisions: Literal["llm", "rules"] = "llm"  # "rules": no LLM calls at all (R9.4)
     llm: LLMSettings = LLMSettings()
