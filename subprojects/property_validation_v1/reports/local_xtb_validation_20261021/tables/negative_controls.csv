@@ -1,0 +1,9 @@
+csv_schema_version,candidate_id,smiles,parent_smiles,round,generator,xtb_status,xtb_gap_ev,xtb_error,xyz_path,orca_status,orca_selection,failure_stage,orca_gap_ev,orca_error,method,ff_energy_kcal_mol,ff_boltzmann_weight,temperature_k,n_unique_conformers,xtb_calls_total,orca_calls_total,cache_hits_total,runtime_s_total
+2,neutral_control,CCO,CCO,1,batch_input,ok,12.295817968777,,\\?\<checkout>\.tools\intensive-local\negative_controls\xyz\neutral_control.xyz,not_run,not_requested,,,,,-1.5170975771483088,1.0,298.15,1.0,1,0,0,0.062999999965541
+2,radical_methyl,[CH3],[CH3],1,batch_input,failed,,ValueError: iteration 1 supports neutral closed-shell molecules only,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,radical_oxygen,[O],[O],1,batch_input,failed,,ValueError: iteration 1 supports neutral closed-shell molecules only,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,charged_ammonium,[NH4+],[NH4+],1,batch_input,failed,,ValueError: iteration 1 supports neutral closed-shell molecules only,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,charged_acetate,CC(=O)[O-],CC(=O)[O-],1,batch_input,failed,,ValueError: iteration 1 supports neutral closed-shell molecules only,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,disconnected,CC.O,CC.O,1,batch_input,failed,,ValueError: one valid connected molecule required,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,invalid,not-a-smiles,not-a-smiles,1,batch_input,failed,,ValueError: one valid connected molecule required,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0
+2,no_mmff,[He],[He],1,batch_input,failed,,ValueError: MMFF94 parameters unavailable; no alternative force field is used,,not_run,not_requested,predict,,,,,,,,0,0,0,0.0

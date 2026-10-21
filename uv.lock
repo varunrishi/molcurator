@@ -2571,6 +2571,11 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.optional-dependencies]
+reports = [
+    { name = "matplotlib" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "jupyter" },
@@ -2587,6 +2592,7 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=1.0" },
     { name = "langgraph", specifier = ">=0.2" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1" },
+    { name = "matplotlib", marker = "extra == 'reports'", specifier = ">=3.8" },
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<2" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.0" },
@@ -2599,6 +2605,7 @@ requires-dist = [
     { name = "selfies", specifier = ">=2.1" },
     { name = "typer", specifier = ">=0.12" },
 ]
+provides-extras = ["reports"]
 
 [package.metadata.requires-dev]
 dev = [
