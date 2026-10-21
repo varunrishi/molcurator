@@ -1,101 +1,54 @@
-# Using the chemistry tools in the MolCurator agent
+# Property predictor integration with the agent
 
-The shared PREDICT/VALIDATE contracts remain unchanged. `molcurator_property_validation.tools.chemistry.run_chemistry_round` now provides a configured, callable chemistry stage: predict -> calibrated selection -> reference validation -> prepared CuratedEntry records. It can be called from a future graph node; it does not implement the full LangGraph agent, generator, or persistent CURATE.
+The contribution's primary interface is **property prediction for generated molecules**. Generation, backend choice, screening/ranking policy, QM budgets, graph routing and persistent curation belong to the main agent. All implementation and artifacts of this contribution remain under the subproject folder.
 
-## Setup and supported config
+## Bind to the existing PREDICT contract
 
-Use the isolated subproject environment described in [README.md](../README.md), with Python 3.11+ and its dependencies and exported `XTB_BIN`/`ORCA_BIN` executable paths. Adapters read process environment variables rather than loading `.env`. Run real calculations on an allocated compute node. See [the cluster guide](../CLUSTER.md).
+```python
+from molcurator_property_validation import PredictorSettings, PropertyPredictor
 
-Load `configs/homo_lumo_calibrated.yaml` for the opt-in configuration: HOMO–LUMO gap in eV, B3LYP/def2-SVP, an exploratory 0.75 eV calibrated band, and a 20-slot QM budget. Existing use-case configs and shared defaults are unchanged. The stage respects `config.screening.margin`; using the original 0.2 eV config does not silently widen it. This is a ranking/exploration band, never a hard rejection threshold.
+xtb_tool = PropertyPredictor(PredictorSettings(backend="xtb"))
+# The team's exact signature and Prediction result models:
+# predictions = xtb_tool.predict(candidates, target, xyz_dir)
+```
 
-The stage supports connected neutral closed-shell molecules and frozen GFN2-xTB -> ORCA B3LYP/def2-SVP gap calibration. It rejects other targets, units and reference methods before chemistry. TADF, PBE0-calibrated ranking and PySCF are not supplied by this stage.
+The target's name chooses the requested property; units must be eV for `homo`, `lumo`, `homo_lumo_gap`, and D for `dipole`. Unsupported targets/units return per-input failures. Physics results return geometries at `xyz_dir/<candidate_id>.xyz`; request-specific method metadata and rich results stay under `xyz_dir/property_predictions/`. An already-created XYZ directory is accepted. The agent explicitly injects this callable; no root tool or schema is patched.
 
-## Call from a node or Python workflow
+For an ML callable use `PropertyPredictor(PredictorSettings(backend="ml", model_path=...)).predict`. ML returns no geometry. A reference-calculation step must prepare/supply geometry separately; do not pass an ML prediction with no geometry blindly into the older VALIDATE adapter.
+
+## Rich multi-property interface
 
 ```python
 from pathlib import Path
-from molcurator.config import load_config
-from molcurator.schemas import Candidate
-from molcurator_property_validation.tools.chemistry import run_chemistry_round
+from molcurator.schemas import QMSettings
+from molcurator_property_validation import PredictorSettings, predict_properties
 
-config = load_config("configs/homo_lumo_calibrated.yaml")
-candidates = [Candidate(id="r1-c001", smiles="CCO", parent_smiles="CCO",
-                        round=1, generator="manual")]
-result = run_chemistry_round(
-    candidates, config, Path("data/runs/my-run"),
-    qm_calls_used=0, exploration_slots=1,
-)
-# result['predictions']: original ordered Prediction objects, failures included
-# result['ranking']: calibrated metadata; Prediction.value remains raw xTB
-# result['qm_results']: ordered QMResult objects for the chosen batch
-# result['curated_entries']: reference-target hits ready for a future CURATE
-# result['qm_calls_charged']: conservative reserved QM slots, including failures
-# result['stage_path']: persisted evidence for this round
-# result['geometry_reports']: FF metadata, including sampled-set Boltzmann weights
+# candidates is the list emitted by the team's generator.
+# settings = PredictorSettings(
+#     backend="orca", properties=["homo", "lumo", "homo_lumo_gap", "dipole"],
+#     qm=QMSettings(backend="orca", functional="B3LYP", basis="def2-SVP"),
+# )
+# results = predict_properties(candidates, settings, Path("runs/property-request-001"))
 ```
 
-The default rule prioritizes calibrated distance and reserves up to `exploration_slots` candidates outside the band, while keeping at least one priority slot. Sampling is deterministic from `config.rng_seed + round`. A one-slot batch has no separate exploration slot. All successful predictions remain eligible; none are discarded solely because their calibrated distance exceeds the margin. Zero remaining QM capacity runs prediction but performs no validation.
+Use a new output directory for the rich API. Results retain input IDs/order and contain `values`, `units`, `method`, `backend`, `xyz_path`, `errors`, and `metadata`. Overall status is failed if any requested property is unavailable; available values remain explicit. `result.as_prediction(property_name)` converts one available property to the unchanged shared model and reports failure if that property is missing. Keep the rich record alongside the shared result because the shared schema has no method/uncertainty/multiple-property fields.
 
-Candidates must have unique IDs and belong to a single configured round. The stage refuses to overwrite an existing round directory: it cannot silently repeat calculations on resume. Give distinct runs distinct run directories.
+## Backend and geometry behavior
 
-## Let the agent choose the QM batch
+- **xTB:** one lowest-converged-FF geometry -> one GFN2-xTB optimization. Geometry reports contain the sampled FF Boltzmann weight at 298.15 K. No ORCA calculation occurs.
+- **ORCA:** default geometry preparation is the same xTB pipeline, then one configured ground-state ORCA single point. `geometry="force_field"` skips xTB and uses the lowest FF minimum. `xyz_paths={candidate_id: path}` uses supplied XYZ instead. Supplied XYZ composition is checked against SMILES including hydrogens, but this check does not prove stereochemical identity; the caller owns geometry provenance. Method and geometry policy must both match for reference/calibration comparisons.
+- **ML:** load a separately trained `FingerprintModel` JSON. It consumes SMILES, uses no embedding or QM, and returns only properties trained into the artifact. The record includes the artifact hash, declared reference method, and `uncertainty="not_available"`. No model is automatically trained or fetched.
 
-Pass a callback to receive ranking records and remaining capacity *after PREDICT*, without repeating prediction:
+Set process `XTB_BIN` and `ORCA_BIN`; `.env` is not loaded by the tool. `MOLCURATOR_QC_TIMEOUT_S` controls each physics process timeout (600 seconds by default). ORCA uses one thread and 2000 MB maxcore. Install using the [subproject README](../README.md), and run real chemistry on allocated compute nodes.
 
-```python
-# Called inside the same chemistry-stage invocation:
-def choose_qm(ranking, remaining):
-    # In the real graph, build the compact LLM view and validate its decision here.
-    # This example is only the deterministic closest-first fallback.
-    usable = [r for r in ranking if r['status'] == 'ok' and r['xyz_path']]
-    return [r['candidate_id'] for r in usable[:remaining]]
+## Budget and failure responsibilities
 
-# result = run_chemistry_round(candidates, config, run_dir,
-#     qm_calls_used=state_qm_calls, select_qm=choose_qm)
-```
+The agent decides how many molecules to send to each backend before dispatch. One ORCA molecule makes at most one ORCA attempt, without retries; default geometry preparation additionally makes one xTB optimization. ORCA `attempt.json` and result metadata record failed attempts as well. These are per-request records, not a cumulative campaign ledger. Configuration/model errors fail before a request starts where possible; per-molecule chemistry and missing properties remain failed records with their IDs.
 
-Returned IDs must be unique successful predictions with geometries. Unknown, duplicate or failed IDs raise before QM dispatch. Oversized valid batches are trimmed in the requested order and the original size is recorded. Supplying a callback replaces the automatic exploration fallback, so the agent's policy must retain its intended exploration allocation. `selected_ids=[...]` is also accepted for a prechosen batch; do not combine it with a callback.
+The predictor does not implement checkpoint/resume, cumulative quotas, a persistent calculation cache, human approval or the complete graph. It never decides whether a molecule is a true target hit. Use actual reference values with method labels to make that decision, then construct/persist CuratedEntry records in the main agent. ML estimates and calibrated xTB estimates must not be stored as if they were ORCA observations.
 
-The existing graph specification includes a raw-xTB hard screen. Integrating this calibrated stage requires replacing that screen, not inserting ranking after it: otherwise candidates can be lost before calibration. This branch provides the stage and preserves current contracts; the graph maintainer must approve and implement its routing/selection policy. Do not call PREDICT/VALIDATE again around this all-in-one stage.
+## Existing compatibility utilities
 
-## Budgets, errors and state
+The earlier `molcurator_property_validation.tools.predict.predict` remains the xTB gap-only contract adapter. `tools.validate.validate` remains its ORCA gap reference adapter. The optional `tools.chemistry.run_chemistry_round` helper combines calibrated selection and entry preparation for the earlier HOMO–LUMO experiment; it is not required for the property predictor and does not run automatically.
 
-Before calling, pass the run's cumulative `qm_calls_used`. The stage enforces `max_qm_calls` for this reservation and rejects candidate rounds beyond `max_rounds`. It writes selected IDs and `qm_calls_charged` *before* calling VALIDATE. Treat that value as a conservative debit, not a count of successful calculations. An input rejected by the underlying validator may launch no external process but still consume a reservation.
-
-After a successful return, accumulate the debit in run state. If the stage raises after reservation, read `stage.json` and preserve its debit and failures before retrying. Per-calculation `attempt.json` describes only the latest invocation; neither file is a cross-run ledger. The graph owns cumulative state, concurrency control, checkpoints, cache reuse, whole-run wall-time enforcement, and stopping when dataset size is reached. This synchronous stage does not implement LangGraph interrupts or resume; human approval belongs in the selector callback or an independently managed staged graph.
-
-Whole-tool exceptions or ID/order contract violations persist failed stage evidence and re-raise for the graph's error route. Per-molecule tool failures remain normal records. No hidden QM retries are performed. The stage checks returned reference method labels and finite successful values.
-
-## Curating and reporting
-
-The stage accepts only successful reference values within `config.target` bounds. It joins Candidate/Prediction/QMResult by ID and constructs shared CuratedEntry records with:
-
-- original candidate SMILES and xTB geometry;
-- `properties={'xtb': raw_prediction, 'dft:B3LYP/def2-SVP': actual_reference}`;
-- parent/generator/round/seed provenance and a stage evidence path.
-
-Calibrated estimates remain in ranking metadata, not under the reference-method property key. The root `curate()` still raises `NotImplementedError`; the caller must implement/use persistent idempotent storage before a complete agent run can save these entries as its dataset. Existing research CSV exports are separate utilities.
-
-The immutable round directory is `run_dir/chemistry/round-N/`. It contains `stage.json`, a config snapshot, candidates, predictions, ranking/selection, failures, reserved QM debit, reference results, prepared entries and FF geometry report metadata. Actual geometries and raw logs are under its `xyz/` directory:
-
-- `<id>.xyz`: optimized geometry returned in Prediction.
-- `calculations/<id>/xtb/geometry_report.json` and `.md`: force field, selected energy, unique sampled minima, FF Boltzmann weight at 298.15 K.
-- `calculations/<id>/xtb/xtb.out`: raw optimization/property output.
-- `calculations/<id>/orca/gap.inp`, `orca.out`, `attempt.json`: reference input/output and latest attempt.
-
-Have the agent summary use `geometry_reports` and link the stage evidence. The weight is conditional on sampled FF minima, not an experimental or QM ensemble population. ORCA performs a ground-state single point at the xTB geometry; this stage does not calculate fluorescence or S1–T1 gaps.
-
-## Offline agent development
-
-`ChemistryTools` supports dependency injection, so the team can test nodes without binaries:
-
-```python
-from tests.agent.fakes import FakeTools
-from molcurator_property_validation.tools.chemistry import ChemistryTools
-fake = FakeTools()
-tool_bindings = ChemistryTools(predict=fake.predict, validate=fake.validate)
-# result = run_chemistry_round(candidates, config, run_dir,
-#     qm_calls_used=0, tools=tool_bindings)
-```
-
-Tests cover the config, fake/real bindings, budget exhaustion, callback trimming/validation, failed QM debits, per-molecule errors, order-contract checks, reference-target acceptance, and overwrite prevention. Fake outputs are test fixtures; never use them as scientific data.
+The frozen calibrated ranking utility remains separate from trained molecular ML. Its B3LYP calibration evidence does not establish accuracy for a new ridge model, another method, or another property. The root main project still owns all agent decisions and persistent CURATE.

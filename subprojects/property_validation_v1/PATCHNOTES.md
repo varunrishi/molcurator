@@ -1,5 +1,18 @@
 # MolCurator — Patch Notes
 
+## Property predictor tool
+
+The primary entry point is now `predict_properties(candidates, settings, output_dir)`, or the `molcurator-properties predict` CLI. It predicts requested properties for generated molecules using a selected xTB, ORCA, or separately trained fingerprint-ridge ML backend. `PropertyPredictor(settings).predict` binds it to the unchanged single-property team contract. The tool does not generate, rank/select by target, or curate molecules automatically.
+
+- Properties: HOMO, LUMO, HOMO–LUMO orbital gap (eV), dipole magnitude (D), where the method/model provides them.
+- Results retain IDs/order, method, units, geometry provenance and explicit per-property failures. Partial values are preserved.
+- ORCA supports supplied geometry, xTB refinement (default), or explicit FF-only preparation; one ORCA attempt per molecule.
+- ML consumes SMILES using a trained portable JSON model. Separate optional `train-ml` fitting is available; no pretrained model or validated uncertainty is included.
+- All 70 offline checks pass, including trained-model roundtrip, CLI fitting/inference, backend dispatch, partial results and agent binding. Actual physics compatibility still needs cluster checks.
+- Existing calibration/campaign helpers remain supporting utilities. Historical B3LYP calibration evidence is not evidence for a new ML model or every newly exposed property.
+- All changes remain inside this subproject; root files are untouched. See [README](README.md) and [agent usage](docs/AGENT_CHEMISTRY_USAGE.md).
+
+
 ## Property validation and calibrated screening
 
 **Reviewed:** 21 October 2026
