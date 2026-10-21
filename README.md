@@ -82,7 +82,7 @@ At the end it lists anything it could not do automatically.
 
 - **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
 - **Ollama** (optional, for a local model): https://ollama.com/download.
-- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package).
+- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package). QM is off by default, so ORCA is only needed with `qm.enabled: true`.
 - **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
 
 ### Choosing the LLM
@@ -119,6 +119,72 @@ On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheel
 
 - **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
 
+## Running the agent
+
+```bash
+molcurator run -c configs/homo_lumo.yaml
+```
+
+The agent works in rounds. Each round it:
+1. generates candidates from the best molecules so far, starting from the seeds in the config
+2. runs xTB on a random sample of them (`predict.n_xtb`)
+3. trains an ML model once enough xTB values exist (`train.min_examples`), and scores the rest with it
+4. screens the candidates against the target window
+5. adds hits to the dataset
+
+It stops when the dataset reaches `budget.target_dataset_size`, or when another budget runs out:
+`max_rounds`, `max_qm_calls` or `max_wall_time`.
+
+Each step prints a line when it finishes:
+
+```
+Run 20261021-201525-7864 started
+r1 plan_round Rule: repeat the previous settings with the best parents so far. (0.0 s)
+r1 generate generated 100 (0.1 s)
+r1 predict predicted 98 · failed 2 (38.8 s)
+r1 train skipped: below_min_examples
+r1 ml_predict skipped: no_candidates_left
+r1 screen screened_out 81 · screened_in 17 (0.0 s)
+r1 curate curated 9 (0.0 s)
+r1 close_round generated 100 · xTB 100 · ML 0 · screened in 17 · hits 9 (0.0 s)
+r1 continue_or_stop Rule: budget remains. (0.0 s)
+...
+Run 20261021-201525-7864 stopped: target_dataset_size. Dataset size: 28.
+```
+
+Options:
+- `--run-id <name>` names the run folder. An existing run is never overwritten.
+- `--runs-root <dir>` changes where run folders go (default `data/runs`).
+
+The command exits with code 1 if a step crashed. The error is printed and saved in the trace and
+summary.
+
+**Outputs**, in `data/runs/<run_id>/`:
+
+| File | Contents |
+|---|---|
+| `dataset.csv` | the curated molecules: id, SMILES, XYZ path, values at each level (`ml`, `xtb`, `qm` with `qm_method`), whether QM-validated, and provenance (parent, round, generator, seeds) |
+| `xyz/` | geometries from xTB |
+| `models/` | trained ML models, one folder per round |
+| `traces/trace.jsonl` | one JSON line per step; see [`docs/trace-format.md`](docs/trace-format.md) |
+| `summary.md` | a short report of the run and why it stopped |
+| `config.yaml` | the exact settings the run used |
+
+**Current limits (v1):**
+- **Decisions use rules** (`decisions: rules` in the configs); the LLM decider is not built yet.
+- **QM validation is off** (`qm.enabled: false`) and not yet wired into the agent.
+- **The real TRAIN tool is still a stub,** so a run stops at TRAIN once it has `train.min_examples`
+  (200) xTB values. With the default 100 candidates per round, that's round 3.
+
+From Python:
+
+```python
+from molcurator.agent.runner import run_agent
+from molcurator.config import load_config
+
+state = run_agent(load_config("configs/homo_lumo.yaml"))
+```
+
 ## Project structure
 
 ```
@@ -131,7 +197,7 @@ src/molcurator/
 configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml)
 data/seeds/      seed molecules
 data/runs/       per-run outputs (gitignored)
-tests/           one test file per tool
+tests/           tool tests, plus tests/agent/ for the agent
 notebooks/       exploration and demo plots
 scripts/         helper scripts
 demo/            presentation and video assets
