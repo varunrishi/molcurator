@@ -42,7 +42,7 @@ molcurator/
 ├── src/molcurator/
 │   ├── tools/            generate.py, predict.py, train.py, validate.py, curate.py, evaluate.py
 │   ├── agent/            graph.py (LangGraph), state.py, llm.py (Anthropic client; optional OpenAI-compatible backend), prompts.py
-│   ├── chem/             convert.py (SMILES/SELFIES/RDKit), geometry.py (3D embedding, XYZ I/O)
+│   ├── chem/             convert.py (SMILES/SELFIES/RDKit), stoned.py (SELFIES mutation/crossover), geometry.py (3D embedding, XYZ I/O)
 │   ├── schemas.py        Pydantic models shared by all tools
 │   └── cli.py            Typer CLI, installed as `molcurator`
 ├── configs/              homo_lumo.yaml, tadf.yaml (one per use case)
