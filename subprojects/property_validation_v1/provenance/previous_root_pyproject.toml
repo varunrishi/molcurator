@@ -1,0 +1,61 @@
+# Package metadata and dependencies for MolCurator.
+# Full setup (Python deps + xtb + LLM): scripts/setup.sh
+# Python deps only, with uv:  uv sync
+#                  with pip:  pip install -e .
+# xtb is not on PyPI; scripts/setup.sh installs it (see README).
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "molcurator"
+version = "0.1.0"
+description = "Agent that creates and curates a molecular benchmark set from a seed molecule"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"   # ChemProp v2 requires Python >= 3.11
+dependencies = [
+    # Agent
+    "langgraph>=0.2",
+    "langgraph-checkpoint-sqlite>=3.1",  # SQLite checkpoints for resume (R7)
+    "langchain-core>=0.3",
+    "anthropic>=1.17",         # Claude Haiku 4.5 decisions with structured output (default)
+    "langchain-openai>=1.0",   # optional OpenAI-compatible backend, e.g. local Ollama
+    "rich>=13",                # live terminal progress (R8.3)
+    # Chemistry
+    "rdkit>=2024.3",           # SMILES handling, sanitisation, 3D embedding
+    "selfies>=2.1",            # STONED SELFIES generation
+    "pyscf>=2.6",              # DFT / TD-DFT for VALIDATE
+    # ML
+    "chemprop>=2.0",           # property model + uncertainty (pulls in torch, lightning)
+    # Intel-Mac limits: torch tops out at 2.2.2 (built against NumPy 1.x),
+    # and RDKit 2026.x ships no Intel-Mac wheels
+    "numpy<2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "rdkit<2026; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    # Data, config, CLI
+    "pandas>=2.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "python-dotenv>=1.0",      # loads settings (XTB_BIN, LLM_*) from .env
+    "py3dmol>=2.5.5",
+    "matplotlib>=3.11.2",
+]
+
+[project.optional-dependencies]
+# Mol2Mol (REINVENT4) backend for GENERATE; REINVENT4 is installed from its git repo,
+# so it is kept optional while STONED SELFIES is the default generator.
+# reinvent = []
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.5", "jupyter"]
+
+[project.scripts]
+molcurator = "molcurator.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

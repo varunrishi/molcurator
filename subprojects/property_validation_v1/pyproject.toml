@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "molcurator-property-validation"
+version = "0.1.0"
+description = "Isolated property extraction, validation and calibrated ranking tools for MolCurator"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["rdkit>=2024.3", "pydantic>=2", "pyyaml>=6"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pandas>=2"]
+reports = ["pandas>=2", "matplotlib>=3.11.2"]
+viewers = ["py3dmol>=2.5.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

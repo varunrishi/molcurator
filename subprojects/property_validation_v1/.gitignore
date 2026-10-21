@@ -15,3 +15,9 @@ runs/
 outputs/
 *.xyz
 *.sdf
+
+# Isolated package environment and local builds
+.venv/
+*.egg-info/
+build/
+dist/

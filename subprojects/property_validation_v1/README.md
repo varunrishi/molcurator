@@ -1,34 +1,48 @@
-# Property extraction and validation — iteration 1
+# Property extraction and validation subproject
 
-This directory is a research subproject of MolCurator. It supplies the first implementation reference for property extraction and quantum-chemical validation. It does not replace the root MolCurator package, its agent architecture, or its roadmap.
+All contributed code, tests, scripts, configs, research results and documentation live inside this directory. Files outside `subprojects/property_validation_v1/` match shared main at `686318f` (`v0.1-contract`). No root tool, schema, agent, dependency, README or configuration changes are required.
 
-Imported on 21 October 2026 from the local `MolCurator_Automated_GitHub` distribution. The supplied documentation is preserved in `UPSTREAM_README.md`; scripts and sample observations are retained as research provenance. Reported numerical results have not been recalculated during integration. This import is a snapshot, not a Git submodule or independently installed root package.
+## Package boundary
 
-## First-iteration scope
+The implementation is `molcurator_property_validation`, under this directory's `src/`. It imports the team's existing `molcurator.schemas` and `molcurator.config` as shared contracts. It never overrides `molcurator.tools` or automatically patches the agent. An agent maintainer can explicitly inject these functions when integrating the contribution.
 
-- `workflows/conformers/conformer_pipeline.py`: conformer generation, force-field optimization/clustering, xTB refinement, and ORCA calculations.
-- `workflows/conformers/extract_properties.py`: extract xTB and ORCA properties into CSV records.
-- `workflows/external/`: independent molecular holdout selection, QC, and frozen-model evaluation.
-- `examples/` and `tests/`: supplied small observations and smoke checks.
+- `src/molcurator_property_validation/tools/`: predict, validate, configured chemistry stage.
+- `src/molcurator_property_validation/chem/`: geometry policy, program execution, gap parsing.
+- `src/molcurator_property_validation/screening/`: frozen calibrated ranking.
+- `src/molcurator_property_validation/visualization/`: optional XYZ viewers.
+- `scripts/`, `configs/`, `tests/`: subproject commands, opt-in config, automated checks.
+- `research/`: calibration and target-validation campaigns, exported data and reports.
+- `workflows/`, `archive_previous/`, `UPSTREAM_README.md`: preserved historical research package.
+- `provenance/previous_root_*`: archived earlier manifests/description for provenance only; do not use them as installation instructions.
 
-The remaining ML, multifidelity, design, iteration-2, figure, and archived workflows are supporting research history. Their inclusion does not make them part of the first-iteration agent implementation.
+## Install without changing the main project
 
-## Run within this subproject
-
-From the repository root:
+From this subproject directory, create a separate Python 3.11+ environment:
 
 ```bash
-cd subprojects/property_validation_v1
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --no-deps -e ../..
+python -m pip install -e '.[test,reports,viewers]'
 python -m pytest -q tests
-python workflows/conformers/extract_properties.py --help
 ```
 
-For actual chemistry, use the subproject's `environment.yml` and read `docs/PROTOCOL.md` and `workflows/conformers/README.md`. The Bash/SLURM workflow assumes a configured Linux cluster and external xTB/ORCA installations. Historical hard-coded paths require adaptation. No QC jobs are submitted by importing this directory or running the supplied tests.
+The first editable install makes the root package's shared contracts importable without pulling its full agent/ML dependencies. The second installs this isolated package and the requested extras. Neither command edits the root project's tracked files. If the root project is already installed in a compatible environment, only the subproject install is needed.
 
-## Relationship to the main project
+## Agent usage
 
-This is an implementation reference for the root `PREDICT`, `VALIDATE`, and `CURATE` tools. The shared data models, tool contracts, run configuration, and fake tools are available from main (tag `v0.1-contract`). The root PREDICT and VALIDATE functions now implement a HOMO–LUMO adapter using the lowest-FF-energy geometry policy. See [ADAPTER.md](ADAPTER.md) for execution, reports, and remaining limitations. Keep dependencies local until an adapter needs them; do not install the archived `molcurator` code into the main environment.
+```python
+from molcurator_property_validation.tools.predict import predict
+from molcurator_property_validation.tools.validate import validate
+from molcurator_property_validation.tools.chemistry import run_chemistry_round
+```
 
-Before integration into the agent, define the property/method/unit contract, convergence and failure acceptance rules, charge/spin support, molecular identity, geometry provenance, and molecule-level dataset splitting. Preserve raw calculation paths and distinguish xTB values, DFT orbital gaps, and vertical excitation energies. The existing scripts' successful termination flags alone are not a complete scientific validation policy.
+The first two retain the team's existing tool signatures and shared result models. The configured stage reads the shared RunConfig, applies calibrated ranking/exploration, enforces a per-round QM reservation, and prepares shared CuratedEntry records. The caller owns graph routing, cumulative budgets, resume and persistent CURATE.
 
-The imported distribution has no explicit license grant; its upstream README records that limitation. Preserve attribution and resolve licensing before redistribution.
+Read [agent usage](docs/AGENT_CHEMISTRY_USAGE.md), [patch notes](PATCHNOTES.md), and [cluster instructions](CLUSTER.md). The supplied stage config is `configs/homo_lumo_calibrated.yaml`. Existing root defaults are untouched.
+
+## Evidence and limitations
+
+The latest pre-isolation suite had 55 passing checks; the relocated suite verifies the same behavior against shared contracts. Real chemistry evidence includes the reported 24-molecule calibration and 60-molecule validation campaign. See [the report](research/property_validation_results/report/REPORT.md). Only one target hit is observed; calibrated ranking is provisional and is not a validated hard rejection policy.
+
+Only connected neutral closed-shell HOMO–LUMO gaps are supported. TADF, PySCF, persistent dataset curation, the full generator/agent loop, and multi-conformer aggregation remain outside this implementation. The imported historical distribution has no explicit license grant; retain attribution and resolve redistribution permissions with the team.

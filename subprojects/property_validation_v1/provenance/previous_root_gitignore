@@ -1,0 +1,72 @@
+# Claude Code personal settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+.env
+.conda/
+
+# ML model checkpoints and logs
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+lightning_logs/
+wandb/
+
+# Quantum chemistry / xTB scratch output
+*.gbw
+*.tmp
+*.densities
+*.engrad
+*.chk
+xtbrestart
+xtbopt.*
+xtbtopo.mol
+charges
+wbo
+.xtboptok
+scratch/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# MolCurator run outputs (dataset, geometries, models, traces)
+data/runs/*
+!data/runs/.gitkeep
+
+# Tools downloaded by scripts/setup.sh (xtb release, Ollama log)
+.tools/
+
+# HPC / SLURM output
+screen-*.out
+validate-*.out
+slurm-*.out
+*.gbw
+*.hess
+
+# Temporary downloaded research archives
+molcurator_calibrated_update.zip
+molcurator_calibrated_update/
+molcurator_calibration24.zip
+molcurator_target_validation.zip
+
+# Local calculation outputs
+**/calculations/
+**/xtb.out
+**/orca.out
