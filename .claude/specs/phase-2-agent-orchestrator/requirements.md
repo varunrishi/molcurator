@@ -127,7 +127,8 @@ output) and asks for a structured answer validated against a Pydantic model.
   of size `predict.n_xtb` (default 200). The sample is drawn with the run's seed, so it is
   repeatable (R7.2).
 - R10.2 TRAIN calls `train()` on every molecule with an xTB value so far (SMILES and xTB
-  value), once there are at least `train.min_examples` of them (default 200), and retrains
+  value), once there are at least `train.min_examples` of them (default 150; changed
+  from 200 because ~7% of xTB runs fail, so a 200-molecule xTB sample never reached it), and retrains
   every later round on all xTB data. Before that, TRAIN is skipped and recorded as skipped.
 - R10.3 `train()` returns model information (model path, number of examples, metrics). The
   latest model is kept in the state and passed to ML PREDICT.

@@ -2553,6 +2553,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "chemprop" },
+    { name = "joblib" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
     { name = "langgraph" },
@@ -2567,6 +2568,7 @@ dependencies = [
     { name = "rdkit", version = "2025.9.3", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "rdkit", version = "2026.3.6", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
     { name = "rich" },
+    { name = "scikit-learn" },
     { name = "selfies" },
     { name = "typer" },
 ]
@@ -2588,6 +2590,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=1.17" },
     { name = "chemprop", specifier = ">=2.0" },
+    { name = "joblib", specifier = ">=1.3" },
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=1.0" },
     { name = "langgraph", specifier = ">=0.2" },
@@ -2602,6 +2605,7 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2024.3" },
     { name = "rdkit", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<2026" },
     { name = "rich", specifier = ">=13" },
+    { name = "scikit-learn", specifier = ">=1.3" },
     { name = "selfies", specifier = ">=2.1" },
     { name = "typer", specifier = ">=0.12" },
 ]

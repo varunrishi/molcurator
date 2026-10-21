@@ -19,6 +19,11 @@ def progress_text(event: dict) -> str:
     if "round_stats" in out:
         s = out["round_stats"]
         detail = f"generated {s['generated']} · xTB {s['xtb_runs']} · ML {s['ml_predicted']} · screened in {s['screened_in']} · hits {s['hits']}"
+    elif "model" in out:  # TRAIN: how much it learned from, and how well it beats guessing the mean
+        m = out["model"]["metrics"]
+        detail = f"trained on {out['model']['n_examples']}"
+        if "test_mae" in m and "baseline_mae" in m:
+            detail += f" · test MAE {m['test_mae']:.2f} (mean baseline {m['baseline_mae']:.2f})"
     elif "results" in out:
         detail = " · ".join(f"{k} {n}" for k, n in Counter(r[1] for r in out["results"]).items())
     else:

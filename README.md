@@ -178,8 +178,9 @@ summary.
   rounds, decide whether to continue and write the summary; it needs `ANTHROPIC_API_KEY` in `.env`, and the
   rules take over whenever an answer is invalid or late.
 - **QM validation is off** (`qm.enabled: false`) and not yet wired into the agent.
-- **The real TRAIN tool is still a stub,** so a run stops at TRAIN once it has `train.min_examples`
-  (200) xTB values. With the default 100 candidates per round, that's round 3.
+- **Molecules screened in by ML alone are curated too,** with an empty `xtb` column in `dataset.csv`. TRAIN
+  starts once `train.min_examples` (150) xTB values exist; its test MAE is about 0.4 eV, so treat ML-only
+  rows as candidates to check, not confirmed hits.
 
 From Python:
 

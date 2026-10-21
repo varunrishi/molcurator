@@ -25,6 +25,8 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import LeaveOneGroupOut, RepeatedKFold
 
+from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status, TrainingExample, TrainResult
+
 _FP_NBITS_FEAT = 1024
 DESCRIPTOR_NAMES = (
     "heavy_atoms", "rings", "aromatic_rings", "aromatic_atoms", "tpsa",
@@ -646,3 +648,56 @@ def screen_pool(
     if not return_scores and "pred_xtb_gap_ev" in selected:
         selected = selected.drop(columns=["pred_xtb_gap_ev", "rf_std"])
     return selected.drop(columns=["_selected"], errors="ignore")
+
+
+def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
+    """TRAIN (contract, R10.2, R10.3): fit the random forest on every xTB value so far and save it in model_dir.
+    A fifth of the examples is held out to measure it; the report card is saved next to the model."""
+    model_dir = Path(model_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = model_dir / "training_data.csv"  # train_property_model reads a CSV; it also records the training set
+    pd.DataFrame({"id": [f"ex{i:05d}" for i in range(len(examples))], "smiles": [e.smiles for e in examples],
+                  "value": [e.value for e in examples]}).to_csv(csv_path, index=False)
+    n_test = max(1, len(examples) // 5)
+    window = (target.min, target.max) if target.min is not None and target.max is not None else None
+    with warnings.catch_warnings(record=True) as caught:  # kept with the model, not printed over the progress lines
+        warnings.simplefilter("always")
+        card = train_property_model(csv_path, out_dir=model_dir, window=window, train_size=len(examples) - n_test,
+                                    test_size=n_test, spec={"target": "value", "units": target.units, "group_col": None,
+                                                            "keep_if": {}, "drop_if": {}})  # agent data: xTB successes only
+    if caught:
+        card["warnings"] = [str(w.message) for w in caught]
+        (model_dir / "report_card.json").write_text(json.dumps(card, indent=2), encoding="utf-8")
+    test, base = card["test_metrics"]["random_forest"], card["test_metrics"]["mean_baseline"]
+    metrics = {"test_mae": test["mae"], "test_rmse": test["rmse"], "test_r2": test["r2"],
+               "baseline_mae": base["mae"], "go": float(card["go"])}
+    return TrainResult(model_path=Path(card["paths"]["model"]), n_examples=card["partition"]["actual"]["train"],
+                       metrics={k: v for k, v in metrics.items() if np.isfinite(v)})  # NaN is not valid JSON
+
+
+def ml_predict(candidates: list[Candidate], target: PropertyTarget, model: TrainResult) -> list[Prediction]:
+    """ML PREDICT (contract, R10.4): one Prediction per candidate, in order. A molecule the model cannot
+    represent (as in screen_pool) is "failed" with the reason, never an exception (R2.4)."""
+    bundle = joblib.load(model.model_path)
+    elements, card = bundle["elements"], bundle["report_card"]
+    low, high = card["heavy_atom_range"]
+    errors, features = {}, {}
+    for c in candidates:
+        mol = _mol_from_smiles(c.smiles)
+        unknown = sorted({a.GetSymbol() for a in mol.GetAtoms()} - set(elements)) if mol else []
+        errors[c.id] = ("invalid_smiles" if mol is None
+                        else "charged_or_radical" if bundle["spec"].get("neutral_closed_shell_only", True) and _is_charged_or_radical(mol)
+                        else "unseen_element: " + ",".join(unknown) if unknown
+                        else "outside_size_range" if not low <= mol.GetNumHeavyAtoms() <= high else None)
+        if errors[c.id] is None:
+            try:
+                features[c.id] = _build_features(mol, elements)
+            except ValueError as e:  # non-finite descriptors
+                errors[c.id] = str(e)
+    ids = list(features)
+    x = np.vstack([features[i] for i in ids]) if ids else np.empty((0, 0))
+    if ids and bundle["model_name"] == "ridge_size":
+        x = x[:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]]
+    values = dict(zip(ids, bundle["model"].predict(x))) if ids else {}  # one batch: much faster than per molecule
+    return [Prediction(candidate_id=c.id, status=Status.ok, value=float(values[c.id])) if c.id in values
+            else Prediction(candidate_id=c.id, status=Status.failed, error=errors[c.id]) for c in candidates]
