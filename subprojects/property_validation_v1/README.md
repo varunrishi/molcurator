@@ -27,7 +27,7 @@ For actual chemistry, use the subproject's `environment.yml` and read `docs/PROT
 
 ## Relationship to the main project
 
-This is an implementation reference for the root `PREDICT`, `VALIDATE`, and `CURATE` tools. No adapter is wired yet: root data models, tool functions, CLI, and LangGraph orchestration remain separate work. Keep dependencies local until an adapter needs them; do not install the archived `molcurator` code into the main environment.
+This is an implementation reference for the root `PREDICT`, `VALIDATE`, and `CURATE` tools. The shared data models, tool contracts, run configuration, and fake tools are available from main (tag `v0.1-contract`). No adapter is wired yet: adapt these research workflows to those contracts before connecting them to the CLI or LangGraph orchestration. Keep dependencies local until an adapter needs them; do not install the archived `molcurator` code into the main environment.
 
 Before integration into the agent, define the property/method/unit contract, convergence and failure acceptance rules, charge/spin support, molecular identity, geometry provenance, and molecule-level dataset splitting. Preserve raw calculation paths and distinguish xTB values, DFT orbital gaps, and vertical excitation energies. The existing scripts' successful termination flags alone are not a complete scientific validation policy.
 
