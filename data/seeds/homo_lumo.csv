@@ -1,0 +1,11 @@
+smiles,mol_id,qm9_dft_gap_ev,heavy_atoms,murcko_scaffold,source
+O=C1N=NOC=C1C#N,gdb_130667,3.064,9,O=c1cconn1,QM9
+c1cc-2ncnoc2c1,gdb_130516,3.1402,9,c1cc2ncnoc-2c1,QM9
+NC1=CC2=C(ON=N2)O1,gdb_129868,3.3579,9,c1cc2nnoc2o1,QM9
+NC1=CC2=C(N1)ON=N2,gdb_129860,3.3987,9,c1cc2nnoc2[nH]1,QM9
+c1c(=O)oc(c(n1)N)O,gdb_26915,3.4912,9,O=c1cncco1,QM9
+c1nc(c(=O)[nH]n1)C=O,gdb_130889,3.5592,9,O=c1cncn[nH]1,QM9
+c1cc(=O)cnc(c1)N,gdb_28830,3.6708,9,O=c1ccccnc1,QM9
+c1c(ncc(=O)[nH]1)N,gdb_4605,3.796,8,O=c1cncc[nH]1,QM9
+O=C1C=CC(=O)C1C#C,gdb_43259,3.9946,9,O=C1C=CC(=O)C1,QM9
+c1cncc(cc1=O)N,gdb_27434,3.9946,9,O=c1cccncc1,QM9

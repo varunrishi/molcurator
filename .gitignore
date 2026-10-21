@@ -52,3 +52,14 @@ data/runs/*
 
 # Tools downloaded by scripts/setup.sh (xtb release, Ollama log)
 .tools/
+
+# QM9 reference dataset: 28 MB and re-fetchable, so not committed.
+# data/seeds/README.md records where it comes from and how to download it.
+data/seeds/qm9.csv
+
+# Personal notes and write-ups, with LaTeX build artefacts
+generate-summary.*
+*.aux
+*.log
+*.out
+*.synctex.gz

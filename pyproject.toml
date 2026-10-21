@@ -47,7 +47,12 @@ dependencies = [
 # reinvent = []
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.5", "jupyter"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "jupyter",
+    "matplotlib>=3.11.2",
+]
 
 [project.scripts]
 molcurator = "molcurator.cli:app"
