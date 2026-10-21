@@ -261,7 +261,7 @@ The local validation report is in [reports/local_xtb_validation_20261021](../rep
 The PREDICT adapter checks each molecule before any xTB launch:
 
 1. Parse one connected SMILES and reject unsupported net charges or radical electrons.
-2. Generate ETKDG conformers. An embedding exception or zero conformers ends that molecule's pipeline.
+2. Generate ETKDG conformers. An empty ensemble reuses an available single geometry, or attempts one ETKDG embedding with random coordinates and the configured seed. This single geometry is still MMFF94 optimized. Failure to obtain any valid geometry ends that molecule's pipeline; embedding exceptions are reported.
 3. Optimize with MMFF94. Missing parameters or zero finite, converged minima ends that molecule's pipeline.
 4. Select the lowest-energy converged minimum, export XYZ, and verify the file, atom count, element symbols and finite coordinates.
 5. Only after these checks may an xTB single point or a verified cache lookup proceed. Successful predictions can be forwarded to ORCA VALIDATE.
@@ -270,6 +270,8 @@ A failed molecule returns its original ID with `status=failed`, an error, and no
 
 Each preparation creates `xyz/calculations/<id>/xtb/prevalidation/<event>.json` and updates `prevalidation.json` beside it. These contain status, stage, code, error and whether electronic work was allowed. The preparation record's `electronic_calls_attempted=0` refers to preparation only; actual later launches are counted in calculation attempt records and cumulative summaries.
 
-Machine-readable reasons include `invalid_or_disconnected_structure`, `unsupported_charge`, `unsupported_radical`, `embedding_failed`, `no_conformers`, `mmff_parameters_unavailable`, `no_converged_conformers`, `xyz_creation_failed`, `missing_xyz`, `xyz_write_failed`, `missing_xyz_file`, and `invalid_xyz`. Unexpected preparation exceptions use `geometry_preparation_failed`. A successful gate reports `geometry_ready`.
+Machine-readable reasons include `invalid_or_disconnected_structure`, `unsupported_charge`, `unsupported_radical`, `embedding_failed`, `single_geometry_failed`, `no_conformers`, `mmff_parameters_unavailable`, `no_converged_conformers`, `xyz_creation_failed`, `missing_xyz`, `xyz_write_failed`, `missing_xyz_file`, and `invalid_xyz`. Unexpected preparation exceptions use `geometry_preparation_failed`. A successful gate reports `geometry_ready`.
 
 CSV exports include `prevalidation_status`, `prevalidation_stage`, `prevalidation_code`, `prevalidation_error`, `input_formal_charge`, and `input_radical_electrons`. Unknown metadata in older runs is blank. No radical repair, charge neutralization, alternate force field, or automatic infinite retry is performed.
+
+Single-geometry fallback is recorded in `geometry_report.json` as `single_geometry_fallback` and `geometry_source`. Its FF weight of 1 is conditional on one sampled minimum and does not establish conformational certainty. Historical reports describe the earlier stop-on-empty-ensemble policy; this fallback supersedes it.

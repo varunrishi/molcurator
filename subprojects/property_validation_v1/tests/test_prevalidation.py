@@ -46,9 +46,10 @@ def assert_stopped(tmp_path, code):
     return prediction
 
 
-def test_no_rdkit_conformers_stops_pipeline_and_removes_stale_xyz(tmp_path, monkeypatch, prohibit_backends):
+def test_no_ensemble_or_single_geometry_stops_pipeline_and_removes_stale_xyz(tmp_path, monkeypatch, prohibit_backends):
     (tmp_path / "mol.xyz").write_text(XYZ)
     monkeypatch.setattr(geometry.AllChem, "EmbedMultipleConfs", lambda *a, **k: [])
+    monkeypatch.setattr(geometry.AllChem, "EmbedMolecule", lambda *a, **k: -1)
     monkeypatch.setattr(geometry.AllChem, "MMFFHasAllMoleculeParams", lambda *a: pytest.fail("must stop before MMFF"))
     assert_stopped(tmp_path, "no_conformers")
 
@@ -124,3 +125,24 @@ def test_rdkit_xyz_export_exception_stops_pipeline(tmp_path, monkeypatch, prohib
         raise RuntimeError("XYZ export failure fixture")
     monkeypatch.setattr(geometry.Chem, "MolToXYZBlock", fail)
     assert_stopped(tmp_path, "xyz_creation_failed")
+
+
+def test_empty_ensemble_uses_single_geometry_and_optimizes(monkeypatch):
+    monkeypatch.setattr(geometry.AllChem, "EmbedMultipleConfs", lambda *a, **k: [])
+    xyz, report = geometry.lowest_ff_conformer("CCO")
+    assert xyz.strip() and report["single_geometry_fallback"]
+    assert report["geometry_source"] == "single_embedding_fallback"
+    assert report["n_converged"] == report["n_unique"] == 1
+    assert report["selected_ff_boltzmann_weight"] == 1
+
+
+def test_empty_ensemble_reuses_existing_single_geometry(monkeypatch):
+    embed = geometry.AllChem.EmbedMolecule
+    def existing(mol, **kwargs):
+        assert embed(mol, randomSeed=42) >= 0
+        return []
+    monkeypatch.setattr(geometry.AllChem, "EmbedMultipleConfs", existing)
+    monkeypatch.setattr(geometry.AllChem, "EmbedMolecule", lambda *a, **k: pytest.fail("must reuse geometry"))
+    xyz, report = geometry.lowest_ff_conformer("CCO")
+    assert xyz.strip() and report["single_geometry_fallback"]
+    assert report["geometry_source"] == "existing_single_geometry"

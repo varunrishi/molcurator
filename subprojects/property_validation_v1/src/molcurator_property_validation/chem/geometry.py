@@ -35,8 +35,28 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
         ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=nconfs, params=params))
     except Exception as exc:
         raise PreparationError("embedding", "embedding_failed", str(exc)) from exc
-    if not ids:
-        raise PreparationError("embedding", "no_conformers", "no embedded conformers")
+    fallback = not ids
+    if fallback:
+        # Reuse coordinates left by embedding if available; otherwise create one
+        # geometry because a SMILES string itself contains no 3D coordinates.
+        if mol.GetNumConformers():
+            ids = [mol.GetConformer().GetId()]
+            geometry_source = "existing_single_geometry"
+        else:
+            single_params = AllChem.ETKDGv3()
+            single_params.randomSeed = settings.random_seed
+            single_params.numThreads = 1
+            single_params.useRandomCoords = True
+            try:
+                cid = AllChem.EmbedMolecule(mol, single_params)
+            except Exception as exc:
+                raise PreparationError("embedding", "single_geometry_failed", str(exc)) from exc
+            if cid < 0 or not mol.GetNumConformers():
+                raise PreparationError("embedding", "no_conformers", "ensemble and single-geometry embedding produced no 3D geometry")
+            ids = [cid]
+            geometry_source = "single_embedding_fallback"
+    else:
+        geometry_source = "conformer_ensemble"
     if not AllChem.MMFFHasAllMoleculeParams(mol):
         raise PreparationError("force_field", "mmff_parameters_unavailable", "MMFF94 parameters unavailable; no alternative force field is used")
     method = "MMFF94"
@@ -66,6 +86,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
     report = dict(policy="lowest_converged_mmff94_energy", electronic_geometry_policy="single_point_on_selected_mmff94_geometry", force_field=method,
                   formal_charge=charge, radical_electrons=radicals,
                   temperature_k=temperature, n_embedded=len(ids), n_converged=len(minima),
+                  geometry_source=geometry_source, single_geometry_fallback=fallback,
                   n_unique=len(unique), selected_conformer_id=cid,
                   selected_ff_energy_kcal_mol=energy, selected_ff_boltzmann_weight=weight,
                   unique_ff_energies_kcal_mol=[e for e, _ in unique],

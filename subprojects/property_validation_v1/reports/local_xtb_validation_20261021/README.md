@@ -2,7 +2,11 @@
 
 21 October 2026. Tool branch: `tools/property-batch-reports-slurm`. Main is unchanged. No new PR was created for these experiments; updates to this existing branch appear in PR 15.
 
-## Preparation failures stop before xTB/ORCA
+## Policy update: single-geometry fallback
+
+After the original tests below, an empty conformer ensemble was changed to reuse an available geometry or attempt a single ETKDG embedding with random coordinates. This geometry is MMFF94 optimized before electronic work. A SMILES-only input does not contain original 3D coordinates. If both ensemble and single embedding fail, the molecule still fails safely. The original 336-molecule numerical results below remain historical evidence; they are not a new real-xTB test of the fallback. See `pytest_single_geometry_fallback.txt` for the updated full-suite result. Tests explicitly exercise successful single embedding, existing-geometry reuse and failure of both paths. A weight of 1 describes the single sampled minimum only.
+
+## Original preparation-gate verification
 
 A molecule with no embedded conformers, no converged MMFF94 minima, or no valid exported XYZ returns a failed prediction with its original ID. It cannot launch xTB; passing that failed prediction to VALIDATE cannot launch ORCA. Other molecules in the batch continue. Charges, radicals, disconnected structures and unavailable MMFF94 parameters are reported separately. Stale published XYZ is removed before a retry.
 
