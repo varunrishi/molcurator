@@ -139,16 +139,34 @@ Decision models (`agent/decisions.py`): `RoundPlan`, `QMBatchDecision`,
 One JSON object per line in `data/runs/<run_id>/traces/trace.jsonl`:
 
 ```json
-{"node": "select_qm_batch", "round": 2, "started": "...", "ended": "...", "status": "ok",
- "summary": {"candidates_shown": 20, "selected": 4},
+{"trace_version": 1, "run_id": "...", "event_id": "<run_id>:r2:select_qm_batch",
+ "node": "select_qm_batch", "round": 2, "started_at": "...", "ended_at": "...",
+ "status": "ok", "inputs": {"candidates_shown": 20}, "outputs": {"selected": ["..."]},
+ "error": null,
  "llm": {"provider": "anthropic", "model": "claude-haiku-4-5", "prompt": "...",
          "raw_response": "...", "decision": {...}, "retried": false, "fallback": null,
          "duration_s": 2.1},
  "budget": {"qm_calls_left": 12, "trimmed_from": null}}
 ```
 
+- Times are ISO 8601 UTC. `event_id` is `<run_id>:r<round>:<node>`, unique because each node
+  runs once per round.
+- `status` is `ok`, `failed` or `skipped`; a skipped line gives a reason, e.g. TRAIN's
+  `below_min_examples`.
+- Tool nodes put the candidate ids in call order in `inputs` and one compact
+  `[candidate_id, status, value or error]` entry per molecule in `outputs`. GENERATE also
+  records its parents and settings; PREDICT records the xTB sample.
+- The first line is a `run_start` event with the run settings (`qm.enabled`,
+  `train.min_examples`, `predict.n_xtb`, budgets). With QM off, SELECT QM BATCH, APPROVE QM and
+  VALIDATE are not in the graph and write no lines; `run_start` explains their absence.
+- The first line written after a resume carries `"resumed": true`. `stop_reason` is in
+  WRITE SUMMARY's outputs.
+- Not in v1: per-item `electronic_calls_attempted` / `cache_hit` for VALIDATE (needs a
+  `QMResult` contract change). The agent caches nothing, so QM calls equal the batch size.
+
 The `llm` key appears only on decision nodes; `fallback` names the rule used
-(`"invalid_answer"`, `"timeout"`, `"api_error"`, `"rules_mode"`). (R6.1–R6.3)
+(`"invalid_answer"`, `"timeout"`, `"api_error"`, `"rules_mode"`). Agreed with the trajectory
+evaluator in issue #13. (R6.1–R6.3)
 
 ## Module layout
 

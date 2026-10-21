@@ -129,7 +129,8 @@ def curate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     levels = lambda m: {"ml": m["ml"], "xtb": m["xtb"], m["qm_method"]: m["qm"]}  # noqa: E731
     entries = [CuratedEntry(id=m["id"], smiles=m["smiles"], xyz_path=m["xyz_path"], validated=m["qm"] is not None,
                             properties={k: v for k, v in levels(m).items() if k and v is not None},
-                            provenance={"parent": m["parent"], "round": str(m["round"]), "seeds": ";".join(config.seeds)})
+                            provenance={"parent": m["parent"], "round": str(m["round"]), "seeds": ";".join(config.seeds),
+                                        "generator": state["round_plan"]["generator"]})  # v1 has one generator
                for m in hits]
     size = tools.curate(entries, Path(state["run_dir"]))  # idempotent, so a resumed re-run adds nothing (R7.2)
     for m in hits:

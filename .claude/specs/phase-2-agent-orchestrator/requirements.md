@@ -96,8 +96,13 @@ output) and asks for a structured answer validated against a Pydantic model.
 
 ## R6 — Traces
 - R6.1 Every node writes one JSON line to `data/runs/<run_id>/traces/trace.jsonl`. Each line
-  holds the node name, round, start and end times, inputs and outputs (summaries, not
-  full molecule lists), and status.
+  holds the trace version, run id, event id, node name, round, start and end times, status
+  (`ok` / `failed` / `skipped`, with a reason when skipped), inputs, outputs and error. Tool
+  nodes record the candidate ids in call order and one compact result per molecule (id,
+  status, value or error), so an evaluator can check each molecule, not just counts. The
+  first line is a `run_start` event holding the run settings (e.g. `qm.enabled`), which
+  explains steps that are absent from the graph. (Changed 2026-10-21 for the trajectory
+  evaluator, issue #13; it previously said "summaries, not full molecule lists".)
 - R6.2 LLM node records also hold the prompt, raw response, parsed decision, whether a
   retry or fallback was used, and the call duration.
 - R6.3 The trace format is documented, so EVALUATE can be built against it without reading
