@@ -52,8 +52,13 @@ dev = ["pytest>=8.0", "ruff>=0.5", "jupyter"]
 [project.scripts]
 molcurator = "molcurator.cli:app"
 
+[tool.setuptools.package-dir]
+"molcurator" = "src/molcurator"
+"molcurator_property_validation" = "subprojects/property_validation_v1/src/molcurator_property_validation"
+
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "subprojects/property_validation_v1/src"]
+include = ["molcurator", "molcurator.*", "molcurator_property_validation", "molcurator_property_validation.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
