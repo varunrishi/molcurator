@@ -91,24 +91,28 @@ tool, and the agent never sees property-specific code.
 ```python
 class MoleculeRecord(TypedDict):
     id: str; smiles: str; round: int; parent: str
-    status: str            # generated | predicted | failed | screened_in | screened_out
-                           # | selected | validated | curated
+    status: str            # generated | duplicate | predicted | failed | screened_in
+                           # | screened_out | selected | validated | curated
+                           # (duplicate: already seen in the run, skipped; R1.5)
     xtb: float | None; qm: float | None; xyz_path: str | None; error: str | None
 
 class AgentState(TypedDict):
     run_id: str
     round: int
     molecules: dict[str, MoleculeRecord]
-    seen_smiles: set[str]
-    plan: RoundPlan | None          # current round's generation settings
+    round_plan: dict | None         # this round's RoundPlan decision, as plain data
     qm_batch: list[str]             # ids chosen for VALIDATE this round
-    qm_calls_used: int
     dataset_size: int
-    round_stats: list[RoundStats]   # per round: generated, failed, screened_in, validated, hits
+    round_stats: list[RoundStats]   # per round: generated, duplicates, failed, screened_in,
+                                    # selected, qm_calls, hits
     stop_reason: str | None         # "llm" | "max_rounds" | "max_qm_calls" | ... | "error"
     error: str | None
     started_at: float
 ```
+
+Seen SMILES (R1.5) are derived from `molecules` plus the config's seeds, and QM calls used
+from the sum of `round_stats[*].qm_calls`, rather than stored separately, so they cannot
+drift out of sync with the records (for example after a resume).
 
 Decision models (`agent/decisions.py`): `RoundPlan`, `QMBatchDecision`,
 `ContinueDecision`, `RunSummary`, each with a `reason` field.
