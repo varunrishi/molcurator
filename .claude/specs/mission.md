@@ -21,7 +21,7 @@ Building molecular benchmark sets and designing molecules with precisely tuned p
 1. **Generate** candidate molecules from a seed molecule (Mol2Mol / REINVENT4 or STONED SELFIES, with RDKit).
 2. **Predict** properties cheaply (SMILES → 3D geometry → xTB optimisation → property extraction) and with ML models (ChemProp), including uncertainty.
 3. **Train** and retrain the ML model on the growing dataset.
-4. **Validate** promising candidates, chosen by uncertainty, with more accurate quantum chemistry (PySCF / ORCA).
+4. **Validate** promising candidates, chosen by uncertainty, with more accurate quantum chemistry (ORCA by default, or PySCF).
 5. **Curate** verified molecules with SMILES, 3D structure and properties at several levels of methodology.
 6. **Evaluate** the agent's trajectories and tool calls.
 7. **Decide** at fixed points in the workflow with an LLM (Claude Haiku 4.5, ~2 s per decision) or with rules (<1 ms), selectable per run.

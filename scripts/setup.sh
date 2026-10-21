@@ -3,7 +3,7 @@
 #   1. .env settings file (from .env.example)
 #   2. Python dependencies with uv (installs uv if missing)
 #   3. xtb binary (existing install, conda-forge env, or Linux release download)
-#   4. Reasoning model: Ollama server + model (skipped when .env points at a hosted endpoint)
+#   4. Decision model: checks the Anthropic key, or sets up Ollama for the OpenAI-compatible backend
 #
 # Usage: scripts/setup.sh [--no-llm]
 #   --no-llm   skip the Ollama step (e.g. a hosted LLM is configured in .env)
@@ -128,9 +128,11 @@ else
 fi
 
 # ---------------------------------------------------------------- 4. LLM
-step "Reasoning model"
+step "Decision model"
+LLM_PROVIDER="${LLM_PROVIDER:-anthropic}"
+if [ "$LLM_PROVIDER" = "anthropic" ]; then DEFAULT_MODEL="claude-haiku-4-5"; else DEFAULT_MODEL="qwen3:4b"; fi
+LLM_MODEL="${LLM_MODEL:-$DEFAULT_MODEL}"
 LLM_BASE_URL="${LLM_BASE_URL:-$OLLAMA_URL/v1}"
-LLM_MODEL="${LLM_MODEL:-qwen3:4b}"
 case "$LLM_BASE_URL" in
     *localhost:11434*|*127.0.0.1:11434*) LOCAL_LLM=1 ;;
     *) LOCAL_LLM=0 ;;
@@ -140,6 +142,13 @@ ollama_up() { curl -fs -m 2 "$OLLAMA_URL/api/version" >/dev/null 2>&1; }
 
 if [ "$SKIP_LLM" = 1 ]; then
     ok "skipped (--no-llm)"
+elif [ "$LLM_PROVIDER" = "anthropic" ]; then
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        ok "Claude backend ($LLM_MODEL): ANTHROPIC_API_KEY is set, nothing to install"
+    else
+        warn "ANTHROPIC_API_KEY is not set"
+        PENDING+=("Add ANTHROPIC_API_KEY to .env for LLM decisions, or use 'decisions: rules' in the run config")
+    fi
 elif [ "$LOCAL_LLM" = 0 ]; then
     ok "hosted endpoint configured ($LLM_BASE_URL, model $LLM_MODEL); nothing to install"
 elif ! command -v ollama >/dev/null 2>&1 && [ ! -d /Applications/Ollama.app ]; then

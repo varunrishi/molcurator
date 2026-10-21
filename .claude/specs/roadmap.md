@@ -7,7 +7,7 @@ Build each tool as a standalone, testable unit with a clear input/output interfa
 - [ ] **GENERATE**: generate new molecules (SMILES / coordinates) from a seed molecule (Mol2Mol / REINVENT4 or STONED SELFIES + RDKit).
 - [ ] **PREDICT**: SMILES → 3D geometry → xTB optimisation → property extraction.
 - [ ] **TRAIN**: train a ChemProp (or similar) model for the target property on the growing dataset, with uncertainty estimates.
-- [ ] **VALIDATE**: compute the target property for screened molecules with quantum chemistry (PySCF / ORCA).
+- [ ] **VALIDATE**: compute the target property for screened molecules with quantum chemistry (ORCA by default, or PySCF).
 - [ ] **CURATE**: add verified molecules to the dataset with SMILES, structure and multi-level properties.
 - [ ] **EVALUATE**: pipelines to evaluate the agent's trajectories and tool calls.
 

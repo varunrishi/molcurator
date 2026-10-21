@@ -18,8 +18,11 @@ requires-python = ">=3.11"   # ChemProp v2 requires Python >= 3.11
 dependencies = [
     # Agent
     "langgraph>=0.2",
+    "langgraph-checkpoint-sqlite>=3.1",  # SQLite checkpoints for resume (R7)
     "langchain-core>=0.3",
-    "langchain-openai>=1.0",   # any OpenAI-compatible endpoint: local Ollama (default) or hosted
+    "anthropic>=1.17",         # Claude Haiku 4.5 decisions with structured output (default)
+    "langchain-openai>=1.0",   # optional OpenAI-compatible backend, e.g. local Ollama
+    "rich>=13",                # live terminal progress (R8.3)
     # Chemistry
     "rdkit>=2024.3",           # SMILES handling, sanitisation, 3D embedding
     "selfies>=2.1",            # STONED SELFIES generation

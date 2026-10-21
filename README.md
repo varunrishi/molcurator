@@ -56,7 +56,7 @@ seed molecule + target property
 - **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
 - **Property prediction (ML)**: [ChemProp](https://github.com/chemprop/chemprop)
 - **Semi-empirical**: xTB
-- **Quantum chemistry**: [PySCF](https://pyscf.org/) or [ORCA](https://www.faccts.de/orca/)
+- **Quantum chemistry**: [ORCA](https://www.faccts.de/orca/) (default, driven from Python by OPI) or [PySCF](https://pyscf.org/)
 
 ## Installation
 
@@ -82,6 +82,7 @@ At the end it lists anything it could not do automatically.
 
 - **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
 - **Ollama** (optional, for a local model): https://ollama.com/download.
+- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package).
 - **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
 
 ### Choosing the LLM
@@ -116,7 +117,6 @@ On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheel
 
 ### Optional
 
-- **ORCA**: an alternative to PySCF for VALIDATE. It needs a free academic licence and is downloaded from https://orcaforum.kofo.mpg.de.
 - **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
 
 ## Project structure

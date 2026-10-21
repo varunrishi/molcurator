@@ -76,7 +76,7 @@ class CuratedEntry(BaseModel):        # CURATE input
     properties: dict[str, float]      # method -> value, e.g. {"xtb": 3.3, "dft": 3.2}
     provenance: dict[str, str]        # seed, parent, generator, round
 
-def generate(parents: list[str], settings: GenerationSettings, rng_seed: int) -> list[Candidate]
+def generate(parents: list[str], settings: GenerationSettings, round: int, rng_seed: int) -> list[Candidate]
 def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) -> list[Prediction]
 def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) -> list[QMResult]
 def curate(entries: list[CuratedEntry], run_dir: Path) -> int   # returns dataset size
