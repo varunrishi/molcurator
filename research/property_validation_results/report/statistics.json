@@ -1,0 +1,19 @@
+{
+  "n_validation_success": 60,
+  "n_target_hits_observed": 1,
+  "sample_mae_ev": {
+    "Raw xTB": 2.23109743167035,
+    "Constant offset": 0.3963992980394437,
+    "Linear": 0.3641390587158602
+  },
+  "pool_weighted_mae_ev": {
+    "Raw xTB": 2.046748873266164,
+    "Constant offset": 0.544861112903416,
+    "Linear": 0.4121798441936215
+  },
+  "target_window_ev": [
+    3.0,
+    3.5
+  ],
+  "note": "Weighted errors are estimates for the 568 successfully screened population under the recorded stratified design."
+}

@@ -1,0 +1,12 @@
+{
+  "name": "GFN2-xTB to ORCA B3LYP/def2-SVP orbital gap calibration",
+  "target": {"name": "homo_lumo_gap", "min_ev": 3.0, "max_ev": 3.5},
+  "fit": {"n_train": 16, "model": "linear", "slope": 0.8270780546046135, "intercept_ev": 2.9901896256531098, "constant_offset_ev": 2.2617441034023127},
+  "initial_holdout": {"n_test": 8, "mae_ev": {"raw_xtb": 2.599789613301125, "constant_offset": 0.6951018271731249, "linear": 0.7717729402787905}, "true_target_hits": 0},
+  "stratified_validation": {"n_qm_success": 60, "screening_pool_n": 568, "sample_true_target_hits": 1,
+    "sample_mae_ev": {"raw_xtb": 2.23109743167035, "constant_offset": 0.3963992980394436, "linear": 0.3641390587158602},
+    "inverse_probability_weighted_pool_mae_ev": {"raw_xtb": 2.0467488732661643, "constant_offset": 0.5448611129034158, "linear": 0.41217984419362136},
+    "observed_hit_recovered": {"raw_xtb_margin_1p5": 0, "constant_margin_0p2": 1, "linear_margin_0p2": 0, "linear_margin_0p5": 1, "linear_margin_0p75": 1},
+    "caveat": "Only one observed hit. Recall is not reliably determined; inverse-probability estimates refer only to successfully screened 568 molecules and carry unreported sampling uncertainty."
+  }
+}

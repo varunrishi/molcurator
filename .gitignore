@@ -52,3 +52,21 @@ data/runs/*
 
 # Tools downloaded by scripts/setup.sh (xtb release, Ollama log)
 .tools/
+
+# HPC / SLURM output
+screen-*.out
+validate-*.out
+slurm-*.out
+*.gbw
+*.hess
+
+# Temporary downloaded research archives
+molcurator_calibrated_update.zip
+molcurator_calibrated_update/
+molcurator_calibration24.zip
+molcurator_target_validation.zip
+
+# Local calculation outputs
+**/calculations/
+**/xtb.out
+**/orca.out

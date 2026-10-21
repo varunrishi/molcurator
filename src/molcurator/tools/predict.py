@@ -49,4 +49,6 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
         except Exception as exc:
             results.append(Prediction(candidate_id=candidate.id, status=Status.failed,
                                       error=f"{type(exc).__name__}: {exc}"))
+    from molcurator.visualization.integration import publish_prediction_viewers
+    publish_prediction_viewers(results, xyz_dir)
     return results

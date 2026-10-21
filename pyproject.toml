@@ -39,6 +39,8 @@ dependencies = [
     "pyyaml>=6.0",
     "typer>=0.12",
     "python-dotenv>=1.0",      # loads settings (XTB_BIN, LLM_*) from .env
+    "py3dmol>=2.5.5",
+    "matplotlib>=3.11.2",
 ]
 
 [project.optional-dependencies]

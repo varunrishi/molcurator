@@ -1,0 +1,17 @@
+{
+  "source": "/work/AG_Presselt/MolCurator/target_validation/screen/validation_results.csv",
+  "output": "research/property_validation_results/calibrated_properties.csv",
+  "n_rows": 60,
+  "n_qm_success": 60,
+  "n_true_hits": 1,
+  "method": "dft:B3LYP/def2-SVP",
+  "calibration": "linear_24",
+  "slope": 0.8270780546046135,
+  "intercept_ev": 2.9901896256531098,
+  "offset_ev": 2.2617441034023127,
+  "target_min_ev": 3.0,
+  "target_max_ev": 3.5,
+  "provisional_margin_ev": 0.75,
+  "note": "Calibrated estimates are research ranking aids, not validated hard-exclusion criteria. Optional unmeasured properties are blank.",
+  "historical_export": "research/property_validation_results/historical_ml276_properties.csv"
+}
