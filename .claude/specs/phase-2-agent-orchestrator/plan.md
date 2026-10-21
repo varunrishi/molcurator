@@ -72,30 +72,44 @@ class QMResult(BaseModel):            # VALIDATE output, one per molecule
     candidate_id: str; status: Status; value: float | None
     method: str; error: str | None = None
 
+class TrainingExample(BaseModel):     # TRAIN input: one molecule labelled by xTB
+    smiles: str; value: float
+
+class TrainResult(BaseModel):         # TRAIN output: where the model is and how it did
+    model_path: Path; n_examples: int; metrics: dict[str, float] = {}
+
 class CuratedEntry(BaseModel):        # CURATE input
-    id: str; smiles: str; xyz_path: Path
-    properties: dict[str, float]      # method -> value, e.g. {"xtb": 3.3, "dft": 3.2}
+    id: str; smiles: str; xyz_path: Path | None   # no geometry for ML-only molecules
+    properties: dict[str, float]      # level -> value, e.g. {"ml": 3.4, "xtb": 3.3, "dft:B3LYP/def2-SVP": 3.2}
+    validated: bool                   # QM-validated (R11.3)
     provenance: dict[str, str]        # seed, parent, generator, round
 
 def generate(parents: list[str], settings: GenerationSettings, round: int, rng_seed: int) -> list[Candidate]
 def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) -> list[Prediction]
+def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult
+def ml_predict(candidates: list[Candidate], target: PropertyTarget, model: TrainResult) -> list[Prediction]  # no geometry
 def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) -> list[QMResult]
-def curate(entries: list[CuratedEntry], run_dir: Path) -> int   # returns dataset size
+def curate(entries: list[CuratedEntry], run_dir: Path) -> int   # writes a table (e.g. CSV); returns dataset size
 ```
 
 The tools return one result per input molecule, never dropping any (R2.4). For TADF,
 PREDICT must return an xTB-level S1-T1 estimate (e.g. sTDA-xTB); that choice belongs to the
-tool, and the agent never sees property-specific code.
+tool, and the agent never sees property-specific code. `train` and `ml_predict` live in
+`tools/train.py`; the ML model behind them is built by the tool work. Adding them, the two
+models and the `CuratedEntry` changes is a contract change, so it goes to `main` in its own
+small PR (see CONTRIBUTING.md) before the agent uses it.
 
 ## State (`agent/state.py`)
 
 ```python
 class MoleculeRecord(TypedDict):
     id: str; smiles: str; round: int; parent: str
-    status: str            # generated | duplicate | predicted | failed | screened_in
-                           # | screened_out | selected | validated | curated
-                           # (duplicate: already seen in the run, skipped; R1.5)
-    xtb: float | None; qm: float | None; xyz_path: str | None; error: str | None
+    status: str            # generated | duplicate | predicted | ml_predicted | unscored
+                           # | failed | screened_in | screened_out | selected | validated | curated
+                           # (duplicate: already seen, skipped, R1.5; unscored: no xTB value
+                           # and no model yet, R10.5)
+    xtb: float | None; ml: float | None; qm: float | None; qm_method: str | None
+    xyz_path: str | None; error: str | None
 
 class AgentState(TypedDict):
     run_id: str
@@ -103,6 +117,7 @@ class AgentState(TypedDict):
     round: int
     molecules: dict[str, MoleculeRecord]
     round_plan: dict | None         # this round's RoundPlan decision, as plain data
+    model: dict | None              # latest TrainResult, as plain data (R10.3)
     qm_batch: list[str]             # ids chosen for VALIDATE this round
     dataset_size: int
     round_stats: list[RoundStats]   # per round: generated, duplicates, failed, screened_in,
@@ -180,6 +195,13 @@ Add `anthropic` (1.17.0 resolves here), `langgraph-checkpoint-sqlite` (3.1.2) an
 5. **Decisions without an LLM:** decision models, `RuleDecider`, `ScriptedDecider`. — R3.5, R9.4
 6. **Tool-step nodes and the screen rule:** generate, predict, screen, validate, curate,
    with per-molecule failures. — R1.3–R1.6
+6b. **TRAIN, ML screening and optional QM** (contract part first, as its own PR to `main`):
+   `TrainingExample`, `TrainResult` and the `CuratedEntry` changes in `schemas.py`; `train`
+   and `ml_predict` signatures in `tools/train.py`; fakes in `FakeTools`. Then on the agent
+   branch: config (`predict.n_xtb`, `train.min_examples`, `qm.enabled`), state (`ml`,
+   `model`, new statuses), `Toolset` fields, the xTB random sample in PREDICT, the TRAIN and
+   ML PREDICT nodes, SCREEN on the best estimate with `unscored`, CURATE on the best estimate
+   with the `validated` flag. — R2.1, R2.2, R10.1–R10.5, R11.1–R11.3
 7. **Graph:** `build_graph`, routing, budget-guarded loop, error route to summary; first
    end-to-end run with fakes and rules. — R1.1, R1.7, R4.3, R4.4
 8. **LLM decisions:** `summaries.py`, `prompts.py`, `LLMDecider` (Anthropic, then OpenAI

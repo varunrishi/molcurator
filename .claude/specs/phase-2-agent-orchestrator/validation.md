@@ -11,7 +11,7 @@ not failed, only when `ANTHROPIC_API_KEY` is absent.
 - **Target:** 100%.
 
 ## Metric 2 — Requirement coverage
-- **What:** every R-ID in this phase's requirements.md (38 IDs, R1.1–R9.5) is referenced by
+- **What:** every R-ID in this phase's requirements.md (46 IDs, R1.1–R11.3) is referenced by
   at least one test, in its name or docstring.
 - **How:** `uv run python scripts/check_requirement_coverage.py
   .claude/specs/phase-2-agent-orchestrator/requirements.md tests/agent`. The script is shared
@@ -48,7 +48,12 @@ not failed, only when `ANTHROPIC_API_KEY` is absent.
   consistent run folder.
 - **Faults injected** (by seed, through `FakeToolset` options and a fake Anthropic client in
   `LLMDecider`):
-  - 20% of molecules fail in PREDICT, and 10% in VALIDATE (R1.6)
+  - 20% of molecules fail in PREDICT, 10% in ML PREDICT and 10% in VALIDATE (R1.6)
+  - QM is off by default, so most runs curate on xTB and ML estimates; in 10 runs QM is
+    switched on (`qm.enabled: true`) to exercise SELECT QM BATCH, VALIDATE and the QM budget
+    (R11.1, R11.2)
+  - in some runs, `train.min_examples` is not reached in round 1, so unscored molecules
+    appear (R10.5)
   - in 10 runs, a whole tool step raises (R1.7)
   - LLM timeouts, invalid answers and API errors, each in some decisions (R3.5, R9.5)
   - in 10 runs, the run is interrupted after a random node and then resumed (R7.2)
@@ -58,6 +63,8 @@ not failed, only when `ANTHROPIC_API_KEY` is absent.
      from `docs/trace-format.md`.
   3. Budgets were never exceeded: QM calls ≤ `max_qm_calls`, rounds ≤ `max_rounds`.
   4. No molecule was dropped: every generated id ends in a final status.
+  4b. Every curated entry records the levels it has values for and its `validated` flag;
+      with QM off, no QM calls were made (R11.1, R11.3).
   5. For the 10 resumed runs: the final state matches an uninterrupted run with the same
      seed, and no trace line is duplicated.
 - **How:** `evals/phase2/robustness.py`, exposing `compute_metrics()`. Rules-mode and
