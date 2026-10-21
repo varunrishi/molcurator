@@ -45,6 +45,9 @@ scratch/
 .DS_Store
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # MolCurator run outputs (dataset, geometries, models, traces)
 data/runs/*

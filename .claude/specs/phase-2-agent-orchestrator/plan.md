@@ -17,8 +17,9 @@
     OpenAI-compatible endpoints such as local Ollama. (R3.1–R3.5, R9.1, R9.5)
   - `RuleDecider`: the fallback rules from R3.5, used for `decisions: rules` and by
     `LLMDecider` as its fallback. (R3.5, R9.4)
-  - `ScriptedDecider` (tests): returns queued answers, including invalid ones, to exercise
-    the retry and fallback paths. (R9.1)
+  - `ScriptedDecider` (tests): returns queued answers per node, as if an LLM answered, and the
+    rules once a queue is empty, to steer the graph in tests. The retry and fallback paths live
+    in `LLMDecider` and are tested there with a fake Anthropic client. (R9.1)
   The Anthropic SDK is used directly rather than through LangChain: it is the documented way
   to get schema-validated output from Claude, and the latency check used exactly this path
   (Haiku 4.5: 2.2 s median, 3/3 valid). LangGraph does not need a LangChain chat model for
@@ -71,44 +72,64 @@ class QMResult(BaseModel):            # VALIDATE output, one per molecule
     candidate_id: str; status: Status; value: float | None
     method: str; error: str | None = None
 
+class TrainingExample(BaseModel):     # TRAIN input: one molecule labelled by xTB
+    smiles: str; value: float
+
+class TrainResult(BaseModel):         # TRAIN output: where the model is and how it did
+    model_path: Path; n_examples: int; metrics: dict[str, float] = {}
+
 class CuratedEntry(BaseModel):        # CURATE input
-    id: str; smiles: str; xyz_path: Path
-    properties: dict[str, float]      # method -> value, e.g. {"xtb": 3.3, "dft": 3.2}
+    id: str; smiles: str; xyz_path: Path | None   # no geometry for ML-only molecules
+    properties: dict[str, float]      # level -> value, e.g. {"ml": 3.4, "xtb": 3.3, "dft:B3LYP/def2-SVP": 3.2}
+    validated: bool                   # QM-validated (R11.3)
     provenance: dict[str, str]        # seed, parent, generator, round
 
 def generate(parents: list[str], settings: GenerationSettings, round: int, rng_seed: int) -> list[Candidate]
 def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) -> list[Prediction]
+def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult
+def ml_predict(candidates: list[Candidate], target: PropertyTarget, model: TrainResult) -> list[Prediction]  # no geometry
 def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) -> list[QMResult]
-def curate(entries: list[CuratedEntry], run_dir: Path) -> int   # returns dataset size
+def curate(entries: list[CuratedEntry], run_dir: Path) -> int   # writes a table (e.g. CSV); returns dataset size
 ```
 
 The tools return one result per input molecule, never dropping any (R2.4). For TADF,
 PREDICT must return an xTB-level S1-T1 estimate (e.g. sTDA-xTB); that choice belongs to the
-tool, and the agent never sees property-specific code.
+tool, and the agent never sees property-specific code. `train` and `ml_predict` live in
+`tools/train.py`; the ML model behind them is built by the tool work. Adding them, the two
+models and the `CuratedEntry` changes is a contract change, so it goes to `main` in its own
+small PR (see CONTRIBUTING.md) before the agent uses it.
 
 ## State (`agent/state.py`)
 
 ```python
 class MoleculeRecord(TypedDict):
     id: str; smiles: str; round: int; parent: str
-    status: str            # generated | predicted | failed | screened_in | screened_out
-                           # | selected | validated | curated
-    xtb: float | None; qm: float | None; xyz_path: str | None; error: str | None
+    status: str            # generated | duplicate | predicted | ml_predicted | unscored
+                           # | failed | screened_in | screened_out | selected | validated | curated
+                           # (duplicate: already seen, skipped, R1.5; unscored: no xTB value
+                           # and no model yet, R10.5)
+    xtb: float | None; ml: float | None; qm: float | None; qm_method: str | None
+    xyz_path: str | None; error: str | None
 
 class AgentState(TypedDict):
     run_id: str
+    run_dir: str                    # run folder, set once by the runner (tests: a temp folder)
     round: int
     molecules: dict[str, MoleculeRecord]
-    seen_smiles: set[str]
-    plan: RoundPlan | None          # current round's generation settings
+    round_plan: dict | None         # this round's RoundPlan decision, as plain data
+    model: dict | None              # latest TrainResult, as plain data (R10.3)
     qm_batch: list[str]             # ids chosen for VALIDATE this round
-    qm_calls_used: int
     dataset_size: int
-    round_stats: list[RoundStats]   # per round: generated, failed, screened_in, validated, hits
+    round_stats: list[RoundStats]   # per round: generated, duplicates, failed, screened_in,
+                                    # selected, qm_calls, hits
     stop_reason: str | None         # "llm" | "max_rounds" | "max_qm_calls" | ... | "error"
     error: str | None
     started_at: float
 ```
+
+Seen SMILES (R1.5) are derived from `molecules` plus the config's seeds, and QM calls used
+from the sum of `round_stats[*].qm_calls`, rather than stored separately, so they cannot
+drift out of sync with the records (for example after a resume).
 
 Decision models (`agent/decisions.py`): `RoundPlan`, `QMBatchDecision`,
 `ContinueDecision`, `RunSummary`, each with a `reason` field.
@@ -118,16 +139,34 @@ Decision models (`agent/decisions.py`): `RoundPlan`, `QMBatchDecision`,
 One JSON object per line in `data/runs/<run_id>/traces/trace.jsonl`:
 
 ```json
-{"node": "select_qm_batch", "round": 2, "started": "...", "ended": "...", "status": "ok",
- "summary": {"candidates_shown": 20, "selected": 4},
+{"trace_version": 1, "run_id": "...", "event_id": "<run_id>:r2:select_qm_batch",
+ "node": "select_qm_batch", "round": 2, "started_at": "...", "ended_at": "...",
+ "status": "ok", "inputs": {"candidates_shown": 20}, "outputs": {"selected": ["..."]},
+ "error": null,
  "llm": {"provider": "anthropic", "model": "claude-haiku-4-5", "prompt": "...",
          "raw_response": "...", "decision": {...}, "retried": false, "fallback": null,
          "duration_s": 2.1},
  "budget": {"qm_calls_left": 12, "trimmed_from": null}}
 ```
 
+- Times are ISO 8601 UTC. `event_id` is `<run_id>:r<round>:<node>`, unique because each node
+  runs once per round.
+- `status` is `ok`, `failed` or `skipped`; a skipped line gives a reason, e.g. TRAIN's
+  `below_min_examples`.
+- Tool nodes put the candidate ids in call order in `inputs` and one compact
+  `[candidate_id, status, value or error]` entry per molecule in `outputs`. GENERATE also
+  records its parents and settings; PREDICT records the xTB sample.
+- The first line is a `run_start` event with the run settings (`qm.enabled`,
+  `train.min_examples`, `predict.n_xtb`, budgets). With QM off, SELECT QM BATCH, APPROVE QM and
+  VALIDATE are not in the graph and write no lines; `run_start` explains their absence.
+- The first line written after a resume carries `"resumed": true`. `stop_reason` is in
+  WRITE SUMMARY's outputs.
+- Not in v1: per-item `electronic_calls_attempted` / `cache_hit` for VALIDATE (needs a
+  `QMResult` contract change). The agent caches nothing, so QM calls equal the batch size.
+
 The `llm` key appears only on decision nodes; `fallback` names the rule used
-(`"invalid_answer"`, `"timeout"`, `"api_error"`, `"rules_mode"`). (R6.1–R6.3)
+(`"invalid_answer"`, `"timeout"`, `"api_error"`, `"rules_mode"`). Agreed with the trajectory
+evaluator in issue #13. (R6.1–R6.3)
 
 ## Module layout
 
@@ -174,6 +213,22 @@ Add `anthropic` (1.17.0 resolves here), `langgraph-checkpoint-sqlite` (3.1.2) an
 5. **Decisions without an LLM:** decision models, `RuleDecider`, `ScriptedDecider`. — R3.5, R9.4
 6. **Tool-step nodes and the screen rule:** generate, predict, screen, validate, curate,
    with per-molecule failures. — R1.3–R1.6
+6b. **TRAIN, ML screening and optional QM** (contract part first, as its own PR to `main`):
+   `TrainingExample`, `TrainResult` and the `CuratedEntry` changes in `schemas.py`; `train`
+   and `ml_predict` signatures in `tools/train.py`; fakes in `FakeTools`. Then on the agent
+   branch: config (`predict.n_xtb`, `train.min_examples`, `qm.enabled`), state (`ml`,
+   `model`, new statuses), `Toolset` fields, the xTB random sample in PREDICT, the TRAIN and
+   ML PREDICT nodes, SCREEN on the best estimate with `unscored`, CURATE on the best estimate
+   with the `validated` flag. — R2.1, R2.2, R10.1–R10.5, R11.1–R11.3
+
+   **v1 scope (2026-10-21):** the first version runs sequentially on the existing rules
+   (`decisions: rules`) with QM off: SEED → GENERATE → PREDICT → TRAIN → ML PREDICT → SCREEN →
+   CURATE, repeating rounds until `target_dataset_size` (or another budget) is reached.
+
+   **Known limitation, QM on:** ML-only molecules have no geometry, so if one is picked for the QM
+   batch, VALIDATE fails (QM needs a starting geometry). Parked fix ("option A"): at the start of
+   VALIDATE, run xTB (`tools.predict`) on batch molecules without a geometry, drop those whose xTB
+   fails from the batch, then validate as usual. No contract change needed.
 7. **Graph:** `build_graph`, routing, budget-guarded loop, error route to summary; first
    end-to-end run with fakes and rules. — R1.1, R1.7, R4.3, R4.4
 8. **LLM decisions:** `summaries.py`, `prompts.py`, `LLMDecider` (Anthropic, then OpenAI

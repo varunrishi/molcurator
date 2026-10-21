@@ -8,6 +8,7 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
+from molcurator.agent.decisions import Decided, RuleDecider
 from molcurator.schemas import (Candidate, CuratedEntry, GenerationSettings, Prediction,
                                 PropertyTarget, QMResult, QMSettings, Status, TrainingExample,
                                 TrainResult)
@@ -114,3 +115,23 @@ class FakeTools:
                 ids.add(e.id); smiles.add(e.smiles)
                 f.write(e.model_dump_json() + "\n")
         return len(ids)
+
+
+class ScriptedDecider:
+    """Test decider: returns the decisions queued for each node, in order, as if an LLM answered;
+    falls back to the rules when a node's queue is empty. `calls` records the order nodes asked."""
+
+    def __init__(self, **queues: list) -> None:  # e.g. continue_or_stop=[ContinueDecision(...), ...]
+        self.queues = {node: list(answers) for node, answers in queues.items()}
+        self.rules = RuleDecider()
+        self.calls: list[str] = []
+
+    def _next(self, node: str, state, config) -> Decided:
+        self.calls.append(node)
+        queue = self.queues.get(node)
+        return Decided(queue.pop(0), source="llm") if queue else getattr(self.rules, node)(state, config)
+
+    def plan_round(self, state, config): return self._next("plan_round", state, config)
+    def select_qm_batch(self, state, config): return self._next("select_qm_batch", state, config)
+    def continue_or_stop(self, state, config): return self._next("continue_or_stop", state, config)
+    def write_summary(self, state, config): return self._next("write_summary", state, config)
