@@ -158,4 +158,4 @@ See [LICENSE](LICENSE).
 
 ## Property extraction and validation subproject
 
-The first research iteration lives in [subprojects/property_validation_v1](subprojects/property_validation_v1/README.md). It preserves the imported conformer, xTB/ORCA property extraction, and validation workflows with their own environment and documentation. It is not yet connected to the main agent tools. See its README for scope, reproduction limits, and provenance.
+The first research iteration lives in [subprojects/property_validation_v1](subprojects/property_validation_v1/README.md). It preserves the imported conformer, xTB/ORCA property extraction, and validation workflows with their own environment and documentation. Contract-compatible HOMO–LUMO PREDICT and VALIDATE adapters are available; see [adapter instructions](subprojects/property_validation_v1/ADAPTER.md). See its README for scope, reproduction limits, and provenance.
