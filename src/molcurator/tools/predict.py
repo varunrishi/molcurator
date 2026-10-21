@@ -17,4 +17,6 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
     (embedding, xTB convergence) is returned with status "failed" and an error, never dropped.
     Every "ok" result has a value and the optimised geometry written to xyz_dir/<id>.xyz.
     """
-    raise NotImplementedError("predict() is built in Phase 1 (tools); use FakeToolset in tests")
+    from molcurator_property_validation.tools.predict import predict as predict_xtb
+
+    return predict_xtb(candidates, target, xyz_dir)

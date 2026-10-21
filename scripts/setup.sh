@@ -183,6 +183,11 @@ uv run python -c "import rdkit, pyscf, chemprop, selfies, langgraph, langchain_o
     && ok "Python packages import" \
     || PENDING+=("Python imports failed: see the error above")
 
+# No calculations are launched here; ORCA must be installed/licensed separately.
+step "Chemistry tool preflight"
+uv run --no-sync python scripts/check_property_tools.py --backend all \
+    || PENDING+=("Chemistry preflight failed: set XTB_BIN/ORCA_BIN in .env or load cluster modules, then re-run uv run --no-sync python scripts/check_property_tools.py")
+
 if [ "${#PENDING[@]}" -eq 0 ]; then
     printf '\n\033[32mSetup complete.\033[0m Activate the environment with: source .venv/bin/activate\n'
 else
