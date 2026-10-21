@@ -82,9 +82,25 @@ class QMSettings(BaseModel):
     basis: str = "def2-SVP"
 
 
+class TrainingExample(BaseModel):
+    """One molecule labelled by xTB, used to train the ML model (R10.2)."""
+
+    smiles: str
+    value: float  # xTB value of the target property
+
+
+class TrainResult(BaseModel):
+    """What TRAIN produced: where the model is saved and how well it fits (R10.3)."""
+
+    model_path: Path
+    n_examples: int = Field(ge=1)
+    metrics: dict[str, float] = {}  # whatever the tool reports, e.g. {"mae": 0.21, "r2": 0.84}
+
+
 class CuratedEntry(BaseModel):
     """One verified molecule in the benchmark set (CURATE input)."""
 
-    id: str; smiles: str; xyz_path: Path
+    id: str; smiles: str; xyz_path: Path | None = None  # None for ML-only molecules (no geometry)
     properties: dict[str, float]  # method -> value, e.g. {"xtb": 3.31, "dft:B3LYP/def2-SVP": 3.18}
+    validated: bool = False  # True only when QM confirmed it (R11.3)
     provenance: dict[str, str]  # seed, parent, generator, round
