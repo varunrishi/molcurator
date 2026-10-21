@@ -43,3 +43,7 @@ One validation invocation makes at most one ORCA attempt per selected molecule, 
 Only connected neutral closed-shell molecules, `homo_lumo_gap` in eV, and the ORCA validation backend are supported. TADF, PySCF, charged/open-shell systems, multiple-conformer aggregation, automatic retries, and cluster scheduling remain out of scope. The generator, curator, and orchestrator are separate work, so this is not a claim that the complete CLI agent runs yet.
 
 Run `python -m pytest -q tests subprojects/property_validation_v1/tests` from the repository root. Adapter tests use real RDKit force-field sampling and simulated xTB/ORCA output/process failures. Actual binary output compatibility and chemistry must still be checked on a configured machine with xTB and ORCA; offline tests do not establish scientific accuracy.
+
+## Cluster smoke job
+
+See [CLUSTER.md](CLUSTER.md) for pulling this branch, setting executable paths, and submitting the dedicated one-molecule SLURM smoke job. Use the new scripts/smoke_homo_lumo.py runner for this adapter rather than the historical conformer job scripts.

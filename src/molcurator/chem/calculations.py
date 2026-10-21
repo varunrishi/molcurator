@@ -24,7 +24,7 @@ def safe_id(candidate_id: str) -> str:
 
 def run(binary_env: str, fallback: str, args: list[str], folder: Path, log: Path):
     """One process attempt, no hidden retries; stdout and stderr retained together."""
-    executable = os.environ.get(binary_env, fallback)
+    executable = os.environ.get(binary_env) or fallback
     resolved = shutil.which(executable)
     if resolved is None:
         raise FileNotFoundError(f"{binary_env}: executable not found: {executable}")

@@ -229,3 +229,44 @@ def test_missing_executable(tmp_path, monkeypatch):
     monkeypatch.setattr(calculations.shutil, 'which', lambda name: None)
     with pytest.raises(FileNotFoundError):
         calculations.run('ORCA_BIN', 'orca', [], tmp_path, tmp_path / 'log')
+
+
+def test_smoke_runner_saves_success_and_prevents_overwrite(tmp_path, monkeypatch):
+    import runpy
+    from molcurator.schemas import QMResult
+    script = Path(__file__).resolve().parents[1] / 'scripts/smoke_homo_lumo.py'
+    smoke = runpy.run_path(str(script))['smoke']
+    def predict(candidates, target, xyz_dir):
+        assert candidates[0].id == 'smoke'
+        assert target.min == 0
+        return [Prediction(candidate_id='smoke', status=Status.ok, value=8,
+                           xyz_path=xyz_dir / 'smoke.xyz')]
+    def validate(items, target, qm):
+        assert items[0].value == 8  # smoke run must not screen out this molecule
+        assert qm.functional == 'PBE0'
+        return [QMResult(candidate_id='smoke', status=Status.ok, value=9,
+                         method='dft:PBE0/def2-SVP')]
+    monkeypatch.setitem(smoke.__globals__, 'predict', predict)
+    monkeypatch.setitem(smoke.__globals__, 'validate', validate)
+    out = tmp_path / 'smoke-run'
+    assert smoke('CCO', 'smoke', out, QMSettings(functional='PBE0')) == 0
+    report = json.loads((out / 'results.json').read_text())
+    assert report['status'] == 'ok'
+    assert report['qm_results'][0]['value'] == 9
+    with pytest.raises(FileExistsError):
+        smoke('CCO', 'smoke', out, QMSettings())
+
+
+def test_smoke_runner_failed_prediction_skips_orca(tmp_path, monkeypatch):
+    import runpy
+    script = Path(__file__).resolve().parents[1] / 'scripts/smoke_homo_lumo.py'
+    smoke = runpy.run_path(str(script))['smoke']
+    monkeypatch.setitem(smoke.__globals__, 'predict', lambda *a: [
+        Prediction(candidate_id='bad', status=Status.failed, error='xTB not installed')])
+    monkeypatch.setitem(smoke.__globals__, 'validate', lambda *a: pytest.fail('must skip ORCA'))
+    out = tmp_path / 'failed-run'
+    assert smoke('CCO', 'bad', out, QMSettings()) == 1
+    report = json.loads((out / 'results.json').read_text())
+    assert report['status'] == 'failed'
+    assert report['qm_results'] == []
+    assert report['predictions'][0]['error'] == 'xTB not installed'
