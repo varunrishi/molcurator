@@ -16,4 +16,4 @@ budget:
   max_rounds: 5
   max_qm_calls: 20
   target_dataset_size: 10
-decisions: llm  # "rules" for fast runs without an LLM
+decisions: rules  # "llm": Claude Haiku 4.5 decides (needs ANTHROPIC_API_KEY), with these rules as fallback

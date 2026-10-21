@@ -27,6 +27,8 @@ class ChemistrySettings(BaseModel):
 
 
 def load_settings() -> ChemistrySettings:
+    if active_settings.get() is not None:
+        return active_settings.get()
     load_binary_environment()
     path = os.environ.get("MOLCURATOR_CHEM_CONFIG")
     values = json.loads(Path(path).read_text(encoding="utf-8-sig")) if path else {}

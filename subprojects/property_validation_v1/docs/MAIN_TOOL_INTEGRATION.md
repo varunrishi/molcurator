@@ -76,3 +76,10 @@ See [Chemistry settings and calculation restart](CHEMISTRY_SETTINGS_AND_RESTART.
 for the follow-up configuration, durable attempt records, cache validation and
 `--resume` smoke option. Settings retain the defaults described above but can now
 override conformer preparation, MMFF convergence, temperature and ORCA resources.
+
+
+## Batch command reports and cluster jobs
+
+See [Batch prediction reports and SLURM jobs](BATCH_REPORTS_AND_SLURM.md) for
+`molcurator-properties run`, automatic CSV/Markdown/PNG reports, checkpointed
+restart and configurable single-job SLURM preparation/submission.

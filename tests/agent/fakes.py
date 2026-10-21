@@ -7,6 +7,7 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 from molcurator.agent.decisions import Decided, RuleDecider
 from molcurator.schemas import (Candidate, CuratedEntry, GenerationSettings, Prediction,
@@ -135,3 +136,20 @@ class ScriptedDecider:
     def select_qm_batch(self, state, config): return self._next("select_qm_batch", state, config)
     def continue_or_stop(self, state, config): return self._next("continue_or_stop", state, config)
     def write_summary(self, state, config): return self._next("write_summary", state, config)
+
+
+class FakeClaude:
+    """Stands in for anthropic.Anthropic in LLMDecider tests: replies in order, each a JSON string (validated
+    against the requested model, as the SDK's messages.parse does) or an exception to raise (R9.2)."""
+
+    def __init__(self, *replies):
+        self.replies, self.prompts = list(replies), []
+        self.messages = self  # LLMDecider calls client.messages.parse(...)
+
+    def parse(self, *, output_format, messages, **kwargs):
+        self.prompts.append(messages[0]["content"])
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=reply)],
+                               parsed_output=output_format.model_validate_json(reply))

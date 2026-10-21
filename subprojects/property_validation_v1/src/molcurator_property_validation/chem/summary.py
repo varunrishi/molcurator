@@ -2,7 +2,7 @@
 import json
 import math
 from pathlib import Path
-from .tracking import native_path
+from ..fileio import native_path
 
 
 def summarize(root):
