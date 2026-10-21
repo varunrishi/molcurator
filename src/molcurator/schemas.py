@@ -70,7 +70,7 @@ class GenerationSettings(BaseModel):
     """How GENERATE should produce this round's candidates (chosen by the plan-round decision)."""
 
     generator: str = "stoned_selfies"
-    n_candidates: int = Field(default=100, ge=1, le=500)
+    n_candidates: int = Field(default=100, ge=1, le=1000)
     mutation_strength: int = Field(default=2, ge=1, le=5)  # e.g. SELFIES edits per molecule
 
 
