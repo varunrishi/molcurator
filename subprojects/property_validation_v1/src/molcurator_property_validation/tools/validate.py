@@ -1,4 +1,4 @@
-"""Contract adapter: one configurable ORCA single point per selected xTB geometry."""
+"""Contract adapter: one configurable ORCA single point per selected MMFF94 geometry."""
 import json
 import re
 import shutil
@@ -28,7 +28,7 @@ def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) ->
                 if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_+*(),./-]*", token):
                     raise ValueError("QM functional and basis must be single keyword tokens")
             if item.status is not Status.ok or item.xyz_path is None:
-                raise ValueError("successful xTB prediction and geometry required")
+                raise ValueError("successful prediction and selected geometry required")
             geometry = item.xyz_path.resolve()
             xyz_symbols(geometry)
             folder = geometry.parent / "calculations" / cid / "orca"

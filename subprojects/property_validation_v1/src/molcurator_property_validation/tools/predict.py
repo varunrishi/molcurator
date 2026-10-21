@@ -1,4 +1,4 @@
-"""Contract adapter: lowest FF minimum -> GFN2-xTB geometry and orbital gap."""
+"""Contract adapter: lowest MMFF94 minimum -> GFN2-xTB single-point orbital gap."""
 import json
 import shutil
 from pathlib import Path
@@ -37,13 +37,13 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
                 f"at {report['temperature_k']} K, among {report['n_unique']} unique "
                 "sampled converged FF minima. This is conditional on the sampled "
                 "conformer set and force-field energy model. The selected geometry "
-                "is refined once with GFN2-xTB before QM validation.\n")
-            run("XTB_BIN", "xtb", ["initial.xyz", "--gfn", "2", "--opt", "normal",
+                "is used unchanged for xTB and ORCA single-point calculations.\n")
+            run("XTB_BIN", "xtb", ["initial.xyz", "--gfn", "2",
                                   "--chrg", "0", "--uhf", "0"], folder, folder / "xtb.out")
             value = xtb_gap((folder / "xtb.out").read_text(errors="replace"))
-            if xyz_symbols(initial) != xyz_symbols(optimized):
-                raise ValueError("xTB changed XYZ atom identities or order")
-            shutil.copyfile(optimized, output)
+            if not xyz_symbols(initial):
+                raise ValueError("invalid selected MMFF94 geometry")
+            shutil.copyfile(initial, output)
             results.append(Prediction(candidate_id=candidate.id, status=Status.ok,
                                       value=value, xyz_path=output))
         except Exception as exc:

@@ -12,7 +12,7 @@ from molcurator.tools.validate import validate
 
 Signatures and shared result models are unchanged. Root setuptools includes the isolated implementation in the normal root installation, so no sys.path manipulation or second subproject installation is required. In an existing compatible environment, run `python -m pip install --no-deps -e .` from the repository root to refresh installation; use the project's normal dependency setup on a fresh machine.
 
-Export XTB_BIN and ORCA_BIN or place executables on PATH and load required cluster runtime modules. PREDICT estimates raw GFN2-xTB HOMO-LUMO gap in eV and returns an optimized XYZ. VALIDATE reuses that geometry for one configured ORCA single point per selected molecule. IDs/order, failed records, geometry reports, raw logs and attempt records are retained. The graph owns selection and cumulative budgets.
+Export XTB_BIN and ORCA_BIN or place executables on PATH and load required cluster runtime modules. PREDICT estimates raw GFN2-xTB HOMO-LUMO gap in eV and returns the selected MMFF94-optimized XYZ. VALIDATE reuses that geometry for one configured ORCA single point per selected molecule. IDs/order, failed records, geometry reports, raw logs and attempt records are retained. The graph owns selection and cumulative budgets.
 
 Scope is neutral closed-shell HOMO-LUMO gaps. PySCF, TADF and ML selection remain separate work. No graph, schema, screening policy or LLM decision changes are included. The agent/orchestrator branch's Toolset.default() already imports these root functions and will use them when both contributions are integrated.
 
@@ -50,3 +50,21 @@ uv run --no-sync python scripts/check_property_tools.py \
 Use a new output directory each time. This performs real ethanol geometry preparation, xTB and one ORCA single point, saves raw calculation artifacts plus `preflight-smoke.json`, and exits nonzero on failure. `--backend orca --smoke` uses an explicitly FF-only geometry, not the xTB/B3LYP calibration protocol. No chemistry runs during the default availability check or setup preflight. Use `--env-file` if settings are not in the root `.env`.
 
 The full project's dependency sync includes ML/agent dependencies and PySCF; native-platform package support is still required. This change reports failures rather than claiming it can automatically install licensed ORCA or fix cluster runtime modules.
+## Geometry policy (iteration 1)
+
+SMILES -> explicit hydrogens -> 30 ETKDGv3 conformers (seed 42) -> MMFF94
+optimization of every conformer (maximum 500 iterations) -> lowest-energy
+converged conformer -> GFN2-xTB and/or configured ORCA HOMO-LUMO single point.
+No xTB or ORCA geometry optimization is performed. Missing MMFF94 parameters
+produce a failed candidate rather than a silent UFF fallback. Charged, radical,
+and disconnected structures are unsupported in this iteration.
+
+The geometry report records selected energy in kcal/mol, converged and unique
+conformer counts, and estimated Boltzmann population at 298.15 K over unique
+sampled minima (0.25 angstrom heavy-atom RMSD clustering). This estimate is
+conditional on the sampled force-field ensemble.
+
+Each electronic backend runs once per eligible selected molecule. Conformer
+generation and MMFF94 optimizations do not count as electronic calculations.
+ORCA validation reuses the selected geometry returned by PREDICT. The ORCA-only
+smoke test prepares the MMFF94 geometry directly without requiring xTB.

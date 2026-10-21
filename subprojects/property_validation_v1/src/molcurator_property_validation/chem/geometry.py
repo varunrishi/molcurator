@@ -23,12 +23,11 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
     ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=nconfs, params=params))
     if not ids:
         raise ValueError("no embedded conformers")
-    if AllChem.MMFFHasAllMoleculeParams(mol):
-        method = "MMFF94"
-        results = AllChem.MMFFOptimizeMoleculeConfs(mol, numThreads=1, maxIters=500)
-    else:
-        method = "UFF"
-        results = AllChem.UFFOptimizeMoleculeConfs(mol, numThreads=1, maxIters=500)
+    if not AllChem.MMFFHasAllMoleculeParams(mol):
+        raise ValueError("MMFF94 parameters unavailable; no alternative force field is used")
+    method = "MMFF94"
+    results = AllChem.MMFFOptimizeMoleculeConfs(
+        mol, numThreads=1, maxIters=500, mmffVariant="MMFF94")
     minima = sorted((float(e), cid) for cid, (status, e) in zip(ids, results)
                     if status == 0 and math.isfinite(e))
     if not minima:
@@ -44,7 +43,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int = 30, temperature: float = 298.
     energy, cid = unique[0]
     weight = 1 / sum(math.exp(-(e - energy) / (0.00198720425864083 * temperature))
                      for e, _ in unique)
-    report = dict(policy="lowest_converged_ff_energy", force_field=method,
+    report = dict(policy="lowest_converged_mmff94_energy", electronic_geometry_policy="single_point_on_selected_mmff94_geometry", force_field=method,
                   temperature_k=temperature, n_embedded=len(ids), n_converged=len(minima),
                   n_unique=len(unique), selected_conformer_id=cid,
                   selected_ff_energy_kcal_mol=energy, selected_ff_boltzmann_weight=weight,

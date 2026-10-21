@@ -35,7 +35,7 @@ def test_public_workflow_preserves_ids_failures_and_geometry(tmp_path,monkeypatc
     def xtb_run(env,b,args,folder,log):
         if folder.parent.name=='bad':raise RuntimeError('xTB failed')
         log.write_text('GEOMETRY OPTIMIZATION CONVERGED\nHOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n')
-        shutil.copyfile(folder/'initial.xyz',folder/'xtbopt.xyz')
+        assert '--opt' not in args
     def orca_run(env,b,args,folder,log):
         assert 'PBE0 def2-TZVP' in (folder/'gap.inp').read_text()
         assert (folder/'geometry.xyz').read_text()==XYZ

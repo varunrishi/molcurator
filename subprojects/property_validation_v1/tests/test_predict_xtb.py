@@ -9,7 +9,7 @@ from molcurator_property_validation.chem.geometry import lowest_ff_conformer, xy
 module=importlib.import_module("molcurator_property_validation.tools.predict")
 TARGET=PropertyTarget(name="homo_lumo_gap",min=3,max=4)
 XYZ="2\nfixture\nH 0 0 0\nH 0 0 .74\n"
-LOG="GEOMETRY OPTIMIZATION CONVERGED\nHOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n"
+LOG="HOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n"
 REPORT=dict(force_field="MMFF94",selected_ff_energy_kcal_mol=0.,selected_ff_boltzmann_weight=1.,temperature_k=298.15,n_unique=1)
 
 
@@ -24,7 +24,7 @@ def test_mixed_results_preserve_ids_geometry_and_weight(tmp_path,monkeypatch):
         calls.append(folder.parent.name)
         if folder.parent.name=="bad":raise RuntimeError("xTB failed")
         log.write_text(LOG)
-        shutil.copyfile(folder/"initial.xyz",folder/"xtbopt.xyz")
+        assert "--opt" not in args
     monkeypatch.setattr(module,"run",run)
     results=module.predict([candidate("good"),candidate("bad"),candidate("last")],TARGET,tmp_path)
     assert [r.candidate_id for r in results]==["good","bad","last"]
@@ -42,7 +42,8 @@ def test_stale_geometry_is_not_accepted(tmp_path,monkeypatch):
     monkeypatch.setattr(module,"lowest_ff_conformer",lambda s:(XYZ,REPORT.copy()))
     monkeypatch.setattr(module,"run",lambda e,b,a,f,l:l.write_text(LOG))
     result=module.predict([candidate("stale")],TARGET,tmp_path)[0]
-    assert result.status is Status.failed
+    assert result.status is Status.ok
+    assert result.xyz_path.read_text() == XYZ
     assert not (folder/"xtbopt.xyz").exists()
 
 
@@ -62,3 +63,17 @@ def test_unsupported_chemistry(smiles):
 def test_unsupported_target_has_failed_result(tmp_path):
     result=module.predict([candidate("x")],PropertyTarget(name="s1_t1_gap",max=.2),tmp_path)[0]
     assert result.status is Status.failed
+
+
+def test_missing_mmff_parameters_fail_without_uff(monkeypatch):
+    from molcurator_property_validation.chem import geometry
+    monkeypatch.setattr(geometry.AllChem, "MMFFHasAllMoleculeParams", lambda mol: False)
+    with pytest.raises(ValueError, match="MMFF94 parameters unavailable"):
+        lowest_ff_conformer("CCO", nconfs=2)
+
+
+def test_selected_energy_is_lowest_converged_minimum():
+    xyz, report = lowest_ff_conformer("CCCC", nconfs=8)
+    assert report["force_field"] == "MMFF94"
+    assert report["selected_ff_energy_kcal_mol"] == min(report["unique_ff_energies_kcal_mol"])
+    assert report["electronic_geometry_policy"] == "single_point_on_selected_mmff94_geometry"

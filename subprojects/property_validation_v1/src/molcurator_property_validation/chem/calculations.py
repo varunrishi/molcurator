@@ -45,8 +45,6 @@ def run(binary_env: str, fallback: str, args: list[str], folder: Path, log: Path
 def xtb_gap(text: str) -> float:
     if not re.search(r"normal termination of xtb", text, re.I):
         raise ValueError("xTB did not terminate normally")
-    if not re.search(r"GEOMETRY OPTIMIZATION CONVERGED", text, re.I):
-        raise ValueError("xTB geometry optimization did not converge")
     matches = re.findall(r"HOMO-LUMO\s+GAP\s+" + f"({NUMBER})" + r"\s+eV", text, re.I)
     if not matches:
         raise ValueError("missing xTB HOMO-LUMO gap")
