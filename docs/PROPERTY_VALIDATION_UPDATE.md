@@ -1,13 +1,13 @@
 # MolCurator — Property validation and calibrated screening update
 
-**Branch:** `codex/property-validation-v1`  
+**Shared update branch:** `codex/calibrated-screening-v1` (based on `codex/property-validation-v1`)
 **Scope:** Chemistry/property-validation contributor; additive integration with v0.1-contract.
 
 ## Implementation status
 
 - The contract-compatible `predict()` tool implements ETKDG conformer search, MMFF94/UFF force-field optimization, deduplication at 0.25 Å RMSD, and selection of the lowest converged FF-energy conformer. Its sampled FF-based Boltzmann weight at 298.15 K is written to a geometry report. It then performs one GFN2-xTB optimization and returns the raw xTB orbital gap and optimized XYZ.
 - The `validate()` tool performs one ORCA single-point calculation per selected successful prediction, using the supplied `QMSettings` (B3LYP/def2-SVP in the HOMO–LUMO config); it preserves IDs, statuses and errors and records QM attempts including failures.
-- Offline test suite: **26/26 passed** on the cluster. Real benzene smoke test succeeded: **4.93426034 eV** xTB gap and **6.84730000 eV** ORCA B3LYP/def2-SVP gap.
+- Earlier cluster check: **26/26 passed**; the current combined offline suite has **42/42 passed** locally. Real benzene smoke test succeeded: **4.93426034 eV** xTB gap and **6.84730000 eV** ORCA B3LYP/def2-SVP gap.
 - Calibration campaign: **24/24 successful** (16 calibration, 8 held-out). On the 8-molecule holdout MAEs were 2.600 eV (raw), 0.695 eV (constant offset), 0.772 eV (linear).
 - Target-enriched experiment: **568** successful xTB-screened molecules, **60/60** selected ORCA validations succeeded, **one** DFT hit in the 3.0–3.5 eV window. On the 60 validation molecules MAEs: raw 2.231 eV, constant offset 0.396 eV, linear 0.364 eV. Inverse-probability-weighted pool MAEs: raw 2.047 eV, constant offset 0.545 eV, linear 0.412 eV (sampling uncertainty not quantified).
 
@@ -35,7 +35,7 @@ Fit on the original **16-molecule calibration split**, not refit on target-enric
 - `src/molcurator/screening/gap.py`: calibration and stable-ranked predictions, while preserving original IDs and failures.
 - `scripts/rank_calibrated_predictions.py`: export ranked screening results from JSON to CSV.
 - `tests/test_calibrated_screening.py`: offline contract-invariance and edge-case tests.
-- `results/calibration_summary.json`: checked-in coefficients and reported summary results (not a replacement for raw datasets).
+- `research/property_validation_results/calibration_summary.json`: checked-in coefficients and reported summary results (not a replacement for raw datasets).
 
 ## Next steps
 

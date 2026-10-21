@@ -159,3 +159,7 @@ See [LICENSE](LICENSE).
 ## Property extraction and validation subproject
 
 The first research iteration lives in [subprojects/property_validation_v1](subprojects/property_validation_v1/README.md). It preserves the imported conformer, xTB/ORCA property extraction, and validation workflows with their own environment and documentation. Contract-compatible HOMO–LUMO PREDICT and VALIDATE adapters are available; see [adapter instructions](subprojects/property_validation_v1/ADAPTER.md). See its README for scope, reproduction limits, and provenance.
+
+## Calibrated screening update branch
+
+The separate `codex/calibrated-screening-v1` branch adds method-specific gap calibration, property exports, research results, and optional molecule viewers. See [the contributor handoff](docs/CALIBRATED_SCREENING_HANDOFF.md) for the branch description, cluster commands, evidence, and integration boundaries. The raw tool contract stays unchanged; calibrated ranking remains provisional and is not an automatic hard rejection policy.

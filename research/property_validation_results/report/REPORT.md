@@ -48,4 +48,4 @@ The calibrated models substantially reduce the systematic offset between xTB and
 
 ## Reproducibility and provenance
 
-Inputs are the saved `validation_results.csv` (60 ORCA labels) and `calibrated_ranking.csv` (screened-pool ranking); the earlier 24-molecule results provide frozen calibration coefficients. Figures and `statistics.json` can be regenerated using `build_report.py`.
+Inputs are the saved `validation_results.csv` (60 ORCA labels) and `calibrated_ranking.csv` (screened-pool ranking); the earlier 24-molecule results provide frozen calibration coefficients. Figures and `statistics.json` can be regenerated using `scripts/build_property_report.py`.
