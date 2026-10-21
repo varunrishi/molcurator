@@ -1,9 +1,9 @@
 # VALIDATE: confirm screened candidates with higher-accuracy quantum chemistry.
 #
-# Backends: ORCA (default, via its Python interface OPI; binary from ORCA_BIN, else `orca` on PATH)
-#           or PySCF (fallback, installed with the package).
+# Backends: ORCA (binary from ORCA_BIN, else `orca` on PATH)
+#           PySCF fallback remains unimplemented.
 #   - DFT for HOMO / LUMO / gap
-#   - TD-DFT for S1 and T1 energies (S1-T1 gap for the TADF use case)
+#   - TADF S1/T1 calculations remain unimplemented.
 # Input geometries come from PREDICT (xTB-optimised).
 # Output: one QMResult (schemas.py) per molecule, with method naming the level of theory.
 from molcurator.schemas import Prediction, PropertyTarget, QMResult, QMSettings
@@ -17,4 +17,6 @@ def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) ->
     failed calculation is returned with status "failed" and an error, never dropped. The agent
     only passes the QM batch, already trimmed to the remaining QM budget (R4.2).
     """
-    raise NotImplementedError("validate() is built in Phase 1 (tools); use FakeToolset in tests")
+    from molcurator_property_validation.tools.validate import validate as validate_orca
+
+    return validate_orca(items, target, qm)
