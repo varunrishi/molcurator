@@ -1,10 +1,11 @@
 """Contract adapter: one configurable ORCA single point per selected MMFF94 geometry."""
-import json
 import re
 import shutil
 
 from molcurator_property_validation.chem.calculations import orca_gap, require_gap_target, run, safe_id
 from molcurator_property_validation.chem.geometry import xyz_symbols
+from molcurator_property_validation.chem.settings import load_settings
+from molcurator_property_validation.chem.tracking import calculate
 from molcurator.schemas import Prediction, PropertyTarget, QMResult, QMSettings, Status
 
 
@@ -17,8 +18,6 @@ def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) ->
     results = []
     method = f"dft:{qm.functional}/{qm.basis}"
     for item in items:
-        attempt = None
-        record = dict(candidate_id=item.candidate_id, method=method, qm_calls_attempted=0)
         try:
             require_gap_target(target)
             cid = safe_id(item.candidate_id)
@@ -33,27 +32,21 @@ def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) ->
             xyz_symbols(geometry)
             folder = geometry.parent / "calculations" / cid / "orca"
             folder.mkdir(parents=True, exist_ok=True)
-            attempt = folder / "attempt.json"
+            settings = load_settings()
             shutil.copyfile(geometry, folder / "geometry.xyz")
             (folder / "gap.inp").write_text(
                 f"! {qm.functional} {qm.basis} TightSCF\n"
-                "%pal nprocs 1 end\n%maxcore 2000\n* xyzfile 0 1 geometry.xyz\n")
-            record.update(qm_calls_attempted=1, status="started", geometry_path=str(geometry))
-            attempt.write_text(json.dumps(record, indent=2))
-            run("ORCA_BIN", "orca", ["gap.inp"], folder, folder / "orca.out")
-            value = orca_gap((folder / "orca.out").read_text(errors="replace"))
-            record.update(status="ok", value=value)
-            attempt.write_text(json.dumps(record, indent=2))
+                f"%pal nprocs {settings.orca_nprocs} end\n"
+                f"%maxcore {settings.orca_maxcore_mb}\n* xyzfile 0 1 geometry.xyz\n")
+            value = calculate(
+                folder, "orca", ["gap.inp"],
+                {"gap.inp": (folder / "gap.inp").read_bytes(),
+                 "geometry.xyz": (folder / "geometry.xyz").read_bytes()},
+                orca_gap, run, settings, dict(candidate_id=item.candidate_id, method=method))
             results.append(QMResult(candidate_id=item.candidate_id, method=method,
                                     status=Status.ok, value=value))
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
-            if attempt is not None:
-                record.update(status="failed", error=error)
-                try:
-                    attempt.write_text(json.dumps(record, indent=2))
-                except OSError:
-                    pass  # Reporting failure must not discard the molecule's result.
             results.append(QMResult(candidate_id=item.candidate_id, method=method,
                                     status=Status.failed, error=error))
     return results

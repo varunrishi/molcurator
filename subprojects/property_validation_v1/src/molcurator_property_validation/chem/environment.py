@@ -15,7 +15,7 @@ def load_binary_environment(path=None):
             line = line[7:]
         key, sep, value = line.partition('=')
         key = key.strip()
-        if not sep or key not in ('XTB_BIN', 'ORCA_BIN', 'MOLCURATOR_QC_TIMEOUT_S'):
+        if not sep or key not in ('XTB_BIN', 'ORCA_BIN', 'MOLCURATOR_QC_TIMEOUT_S', 'MOLCURATOR_CHEM_CONFIG'):
             continue
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):

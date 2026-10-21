@@ -59,7 +59,7 @@ class ToolResult(BaseModel):
 
 
 class Prediction(ToolResult):
-    xyz_path: Path | None = None  # xTB-optimised geometry; VALIDATE starts from it
+    xyz_path: Path | None = None  # selected MMFF94 geometry; VALIDATE uses it for a single point
 
 
 class QMResult(ToolResult):
