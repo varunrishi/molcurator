@@ -13,5 +13,5 @@
   "xtb_bin": "/absolute/cluster/path/to/xtb",
   "orca": false,
   "resume": false,
-  "plots": true
+  "plots": false
 }

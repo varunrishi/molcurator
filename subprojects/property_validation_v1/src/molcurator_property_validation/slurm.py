@@ -41,7 +41,7 @@ class SlurmSettings(BaseModel):
     functional: str = "B3LYP"
     basis: str = "def2-SVP"
     resume: bool = Field(default=False, strict=True)
-    plots: bool = Field(default=True, strict=True)
+    plots: bool = Field(default=False, strict=True)
 
     @field_validator("project_dir", "input", "out", "chemistry_config", "xtb_bin", "orca_bin", "module_init")
     @classmethod
@@ -110,8 +110,8 @@ def render(config):
     arguments += ["--functional", config.functional, "--basis", config.basis]
     if config.resume:
         arguments.append("--resume")
-    if not config.plots:
-        arguments.append("--no-plots")
+    if config.plots:
+        arguments.append("--plots")
     lines += ["", "# A single sequential batch; ORCA PAL uses the allocated CPUs.",
               shlex.join(arguments), ""]
     return "\n".join(lines)

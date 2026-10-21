@@ -5,6 +5,7 @@ from pathlib import Path
 
 from molcurator_property_validation.chem.calculations import require_gap_target, run, safe_id, xtb_gap
 from molcurator_property_validation.chem.geometry import lowest_ff_conformer, xyz_symbols
+from molcurator_property_validation.chem.prevalidation import prepare_geometry
 from molcurator_property_validation.chem.settings import load_settings
 from molcurator_property_validation.chem.tracking import calculate
 from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status
@@ -24,12 +25,10 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
             optimized.unlink(missing_ok=True)
             output = (xyz_dir / f"{cid}.xyz").resolve()
             output.unlink(missing_ok=True)
-            xyz, report = lowest_ff_conformer(candidate.smiles)
+            xyz, report, initial = prepare_geometry(candidate, folder, lowest_ff_conformer, xyz_symbols)
             report.update(candidate_id=cid, smiles=candidate.smiles,
                           parent_smiles=candidate.parent_smiles, round=candidate.round,
                           generator=candidate.generator)
-            initial = folder / "initial.xyz"
-            initial.write_text(xyz)
             (folder / "geometry_report.json").write_text(json.dumps(report, indent=2))
             (folder / "geometry_report.md").write_text(
                 f"# Geometry selection: {cid}\n\n"
@@ -45,8 +44,6 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
                 {"initial.xyz": initial.read_bytes()}, xtb_gap, run, load_settings(),
                 dict(candidate_id=candidate.id, smiles=candidate.smiles,
                      geometry_policy="single_point_on_selected_mmff94_geometry"))
-            if not xyz_symbols(initial):
-                raise ValueError("invalid selected MMFF94 geometry")
             shutil.copyfile(initial, output)
             results.append(Prediction(candidate_id=candidate.id, status=Status.ok,
                                       value=value, xyz_path=output))

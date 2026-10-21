@@ -123,7 +123,7 @@ def test_plots_and_report_only_do_not_run_chemistry(tmp_path, source, tools, mon
     out = tmp_path / "run"
     batch.main(["run", str(source), "--out", str(out), "--no-plots"])
     monkeypatch.setattr(batch, "predict", lambda *a: pytest.fail("report must not calculate"))
-    assert batch.main(["report", str(out)]) == 0
+    assert batch.main(["report", str(out), "--plots"]) == 0
     for name in ("gaps.png", "execution.png", "conformers.png", "status.png"):
         assert (out / "plots" / name).stat().st_size > 1000
     assert "Cumulative" in (out / "report.md").read_text()
@@ -132,7 +132,7 @@ def test_plots_and_report_only_do_not_run_chemistry(tmp_path, source, tools, mon
 def test_all_failed_batch_still_has_plots(tmp_path, tools):
     pytest.importorskip("matplotlib")
     path = tmp_path / "fail.csv"; path.write_text("id,smiles\na,invalid\n")
-    assert batch.main(["run", str(path), "--out", str(tmp_path / "run")]) == 1
+    assert batch.main(["run", str(path), "--out", str(tmp_path / "run"), "--plots"]) == 1
     assert (tmp_path / "run/plots/gaps.png").is_file()
 
 
@@ -205,7 +205,7 @@ def test_missing_plot_dependencies_fail_before_chemistry(tmp_path, source, tools
     def missing():
         raise ImportError("install reports extra")
     monkeypatch.setattr(reporting, "require_plotting", missing)
-    assert batch.main(["run", str(source), "--out", str(tmp_path / "run")]) == 2
+    assert batch.main(["run", str(source), "--out", str(tmp_path / "run"), "--plots"]) == 2
     assert tools == []
 
 
@@ -220,3 +220,20 @@ def test_slurm_module_initialization_is_quoted():
                                   module_init="/etc/profile.d/modules.sh", modules=["gcc/12"])
     text = slurm.render(config)
     assert text.index("source /etc/profile.d/modules.sh") < text.index("module load gcc/12")
+
+
+def test_plotting_is_opt_in_without_importing_plot_backend(tmp_path, source, tools, monkeypatch):
+    def forbidden():
+        pytest.fail("default report must not load plotting")
+    monkeypatch.setattr(reporting, "require_plotting", forbidden)
+    out = tmp_path / "run"
+    assert batch.main(["run", str(source), "--out", str(out)]) == 1
+    assert (out / "summary.csv").exists() and not (out / "plots").exists()
+    assert batch.main(["report", str(out)]) == 0
+    assert "## Figures" not in (out / "report.md").read_text()
+
+
+def test_slurm_plotting_defaults_off_and_explicit_on():
+    values = dict(project_dir="/home/user/project", input="/work/input.csv", out="/work/run")
+    assert "--plots" not in slurm.render(slurm.SlurmSettings(**values))
+    assert "--plots" in slurm.render(slurm.SlurmSettings(**values, plots=True))

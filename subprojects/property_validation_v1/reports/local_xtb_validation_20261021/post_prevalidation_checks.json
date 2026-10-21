@@ -1,0 +1,43 @@
+{
+  "prevalidation_rows": 336,
+  "unchanged_ids_status_values": true,
+  "new_electronic_calls": 0,
+  "additional_cache_hits": 336,
+  "wall_s": 152.0971439999994,
+  "baseline_exit": 0,
+  "negative_exit": 1,
+  "negative_codes": {
+    "neutral_control": "geometry_ready",
+    "radical_methyl": "unsupported_radical",
+    "radical_oxygen": "unsupported_radical",
+    "charged_ammonium": "unsupported_charge",
+    "charged_acetate": "unsupported_charge",
+    "disconnected": "invalid_or_disconnected_structure",
+    "invalid": "invalid_or_disconnected_structure",
+    "no_mmff": "mmff_parameters_unavailable"
+  },
+  "source_hashes": {
+    "batch.py": "96583c1aa14d86129f02924dfde92278672a6c1878fb0537891216fd5474da68",
+    "batch_inputs.py": "634ce4aa04866ffb82c88fa9565079c390e181aa4923f20c3aff7816cda97e87",
+    "batch_runner.py": "41ffcd3a7308c18e55a92a210b1fe0453d0d3ec596e1f4831e8a9f8a1e9dc20e",
+    "batch_runtime.py": "4520f1d69092693ee57b2cdceea8111aaa2e0675aac7bcb6b294e6addd5ad1df",
+    "fileio.py": "9fc76a95cdd2772aaf50348bbe590e30191325efcf9f2e18fe44a511d464aa04",
+    "plotting.py": "aae75a9186c9bf46c732ddf48d7bb6756bfba800a79930b091a9a805cb966f83",
+    "properties.py": "7467b129660670f9f1534ba91dafc86352c8351bdd798dc9b9a620088715cc8c",
+    "reporting.py": "9c4677f8525a442f893af2f92c3015f440d3deeecdebef69ece4c49344717785",
+    "report_tables.py": "0386ca8ef372ee1dbb40304b3741b7b13c0400617d56e0c2a3f179467748faba",
+    "slurm.py": "e4704260ad366a6b806fc761343dd86b611fdd1d1cd0b0ae0536f0ffdc03ad46",
+    "__init__.py": "b666e108ab7c120e9072cf3bddd52be7df9a21873fd7ab472e19b20fa182d944",
+    "chem\\calculations.py": "08b51edd815fc880cf13dba21856ac88031c9f0ab40f41e8e72d972cc8d2004c",
+    "chem\\environment.py": "5f65fefcec564cb59c0099538e4bb86781261c5bd13a1f677cf2b978e999444f",
+    "chem\\geometry.py": "678b62d96ba2963ed3e89e381f743aa7c86613176373601e85de38cff5e6b6f6",
+    "chem\\prevalidation.py": "8a076f11fd439b4c2d092bc4255b4652346df50ff7ba13c6e636da6186caf217",
+    "chem\\settings.py": "86db4d677d7f5b0dc618f35814794304fafb7cd52bc28ccf38150c2c1e64f195",
+    "chem\\summary.py": "00e4af27e9ee36eee8baaa55add01a4c8891e1c3091fbc51110ecc9b64db9d40",
+    "chem\\tracking.py": "56d93549ce542bd15fb97a5b8dae4e1d36eb62e1588957ffef7245fc7c457134",
+    "chem\\__init__.py": "b666e108ab7c120e9072cf3bddd52be7df9a21873fd7ab472e19b20fa182d944",
+    "tools\\predict.py": "dcdbd45d2139dac868f8c3adfbd8486cb4279b186c2f7a2f473886e5b4754017",
+    "tools\\validate.py": "08b416987fdb0bfbcad4d1070ef268b3ad9d4ef6c00a39afea6b7c141082fe07",
+    "tools\\__init__.py": "b666e108ab7c120e9072cf3bddd52be7df9a21873fd7ab472e19b20fa182d944"
+  }
+}

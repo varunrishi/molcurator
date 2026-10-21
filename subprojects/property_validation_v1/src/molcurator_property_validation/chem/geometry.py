@@ -4,6 +4,7 @@ from pathlib import Path
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
+from .prevalidation import PreparationError
 
 
 def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: float | None = None):
@@ -16,19 +17,28 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
         raise ValueError("positive conformer count and temperature required")
     mol = Chem.MolFromSmiles(smiles)
     if mol is None or not mol.GetNumAtoms() or len(Chem.GetMolFrags(mol)) != 1:
-        raise ValueError("one valid connected molecule required")
-    if Chem.GetFormalCharge(mol) or any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
-        raise ValueError("iteration 1 supports neutral closed-shell molecules only")
+        raise PreparationError("structure", "invalid_or_disconnected_structure", "one valid connected molecule required")
+    charge = Chem.GetFormalCharge(mol)
+    radicals = sum(a.GetNumRadicalElectrons() for a in mol.GetAtoms())
+    if charge:
+        raise PreparationError("structure", "unsupported_charge", "iteration 1 supports neutral molecules only",
+                               formal_charge=charge, radical_electrons=radicals)
+    if radicals:
+        raise PreparationError("structure", "unsupported_radical", "iteration 1 supports closed-shell molecules only",
+                               formal_charge=charge, radical_electrons=radicals)
     mol = Chem.AddHs(mol)
     params = AllChem.ETKDGv3()
     params.randomSeed = settings.random_seed
     params.numThreads = 1
     params.pruneRmsThresh = -1
-    ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=nconfs, params=params))
+    try:
+        ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=nconfs, params=params))
+    except Exception as exc:
+        raise PreparationError("embedding", "embedding_failed", str(exc)) from exc
     if not ids:
-        raise ValueError("no embedded conformers")
+        raise PreparationError("embedding", "no_conformers", "no embedded conformers")
     if not AllChem.MMFFHasAllMoleculeParams(mol):
-        raise ValueError("MMFF94 parameters unavailable; no alternative force field is used")
+        raise PreparationError("force_field", "mmff_parameters_unavailable", "MMFF94 parameters unavailable; no alternative force field is used")
     method = "MMFF94"
     properties = AllChem.MMFFGetMoleculeProperties(mol, mmffVariant="MMFF94")
     results = []
@@ -41,7 +51,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
     minima = sorted((float(e), cid) for cid, (status, e) in zip(ids, results)
                     if status == 0 and math.isfinite(e))
     if not minima:
-        raise ValueError("no converged force-field conformers")
+        raise PreparationError("force_field", "no_converged_conformers", "no converged force-field conformers")
     heavy = Chem.RemoveHs(mol)
     unique = []
     for energy, cid in minima:
@@ -54,6 +64,7 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
     weight = 1 / sum(math.exp(-(e - energy) / (0.00198720425864083 * temperature))
                      for e, _ in unique)
     report = dict(policy="lowest_converged_mmff94_energy", electronic_geometry_policy="single_point_on_selected_mmff94_geometry", force_field=method,
+                  formal_charge=charge, radical_electrons=radicals,
                   temperature_k=temperature, n_embedded=len(ids), n_converged=len(minima),
                   n_unique=len(unique), selected_conformer_id=cid,
                   selected_ff_energy_kcal_mol=energy, selected_ff_boltzmann_weight=weight,
@@ -63,7 +74,11 @@ def lowest_ff_conformer(smiles: str, nconfs: int | None = None, temperature: flo
                   n_requested=nconfs, mmff_max_iterations=settings.mmff_max_iterations,
                   mmff_force_tolerance=settings.mmff_force_tolerance,
                   mmff_energy_tolerance=settings.mmff_energy_tolerance)
-    return Chem.MolToXYZBlock(mol, confId=cid), report
+    try:
+        xyz = Chem.MolToXYZBlock(mol, confId=cid)
+    except Exception as exc:
+        raise PreparationError("xyz_export", "xyz_creation_failed", str(exc)) from exc
+    return xyz, report
 
 
 def xyz_symbols(path: Path) -> list[str]:

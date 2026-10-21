@@ -10,10 +10,12 @@ validated restart caches. It does not require an LLM.
 From the repository root on this branch, or after its dependencies are merged:
 
 ```bash
-uv sync --extra reports
+uv sync
 uv run --no-sync molcurator-properties --help
 ```
 
+Plots are off by default. CSV, JSON and Markdown do not require matplotlib.
+Enable plots explicitly with `--plots`; install `uv sync --extra reports` first.
 The `reports` extra installs matplotlib for headless PNG generation. Root package
 installation includes the CLI and chemistry implementation. For an existing
 compatible environment, `python -m pip install -e '.[reports]'` is an alternative.
@@ -101,7 +103,8 @@ cumulative budget or a guarantee of that many fresh ORCA launches. The default
 limit is unlimited; start with a small set. `--orca-limit 0` performs no validation.
 An xTB failure never reaches ORCA. Unselected entries retain explicit reasons.
 
-For CSV/JSON/Markdown without matplotlib, append `--no-plots`. Missing plotting
+CSV/JSON/Markdown are produced by default without loading matplotlib. Use `--plots`
+for PNGs. `--no-plots` remains a compatibility alias for the default. Missing plotting
 dependencies are reported before launching calculations when plots are requested.
 
 ## Restart and checkpoints
@@ -137,7 +140,8 @@ data/runs/generated-001/
   summary.csv              gaps, statuses, errors, provenance and geometry metadata
   report.md                readable report with linked figures
   attempt_summary.json     cumulative launches, cache hits, runtimes and records
-  plots/
+  csv_schema.json          stable CSV version, field list, units and missing-value policy
+  plots/                   created only when --plots is explicitly enabled
     gaps.png               current raw xTB and available ORCA values
     status.png             successful, failed and uncalculated/pending candidates
     execution.png          cumulative process launches, cache reuse and runtimes
@@ -148,7 +152,10 @@ data/runs/generated-001/
 
 CSV fields include candidate ID, SMILES/provenance, each backend's status/value/error,
 method, XYZ path, FF energy, sampled Boltzmann weight, temperature, unique conformers,
-and cumulative per-candidate launches/cache hits/runtime. Missing properties are blank,
+and cumulative per-candidate launches/cache hits/runtime. CSV schema v2 separates
+`orca_status` from `orca_selection` and adds `failure_stage`. Cumulative columns
+are explicitly named `xtb_calls_total`, `orca_calls_total`, `cache_hits_total` and
+`runtime_s_total`; they replace the older ambiguous count names. Missing properties are blank,
 not zero. The report does not fit a calibration or claim experimental accuracy.
 Plots label current results separately from cumulative history. An all-failed batch
 still produces a report and empty-data plots with explicit explanations.
@@ -157,8 +164,8 @@ Regenerate reports without running chemistry:
 
 ```bash
 uv run --no-sync molcurator-properties report data/runs/generated-001
-# Or without plotting:
-uv run --no-sync molcurator-properties report data/runs/generated-001 --no-plots
+# Explicitly regenerate figures:
+uv run --no-sync molcurator-properties report data/runs/generated-001 --plots
 ```
 
 Exit codes: 0 for a completed batch with no molecule failures, 1 for molecule/runtime
@@ -182,7 +189,8 @@ uv run --no-sync molcurator-properties slurm \
 
 Edit the placeholder username, group, executable paths and partition first. Optional
 keys include `account`, `qos`, `modules`, `module_init`, `orca_bin`, `orca`, `orca_limit`, `min_gap`,
-`max_gap`, `functional`, `basis`, `resume` and `plots`. Unknown keys and malformed
+`max_gap`, `functional`, `basis`, `resume` and `plots`. `plots` defaults to false
+and adds `--plots` to the generated command only when explicitly true. Unknown keys and malformed
 resource/directive values are rejected. The Python executable defaults to
 `.venv/bin/python` under `project_dir`. Install the environment with reports on the
 cluster before submitting. Module loading assumes the cluster exposes its `module`
@@ -229,3 +237,39 @@ SLURM directive/path validation and explicit mocked submission. A real local xTB
 batch calculated ethanol, butane and benzene, preserved an invalid input failure,
 generated reports/figures, and reused all three successful results on restart with
 zero new electronic launches. No live SLURM or ORCA execution is claimed by these tests.
+
+
+## Independent modules
+
+- `batch.py`: CLI dispatch and compatibility facade.
+- `batch_inputs.py`: input parsing and identity/provenance validation.
+- `batch_runner.py`: checkpointed execution with injectable prediction/validation functions.
+- `batch_runtime.py`: run locks and allocation checks.
+- `fileio.py`: platform paths and atomic JSON with no chemistry/plotting dependency.
+- `report_tables.py`: normalized CSV rows, stable headers and CSV schema metadata.
+- `reporting.py`: report assembly and cumulative summaries; no plotting imports by default.
+- `plotting.py`: explicitly enabled, headless matplotlib rendering.
+- `slurm.py`: validated job generation and opt-in submission.
+
+Report regeneration and CSV export can run independently of calculations. Plotting
+is a separate optional layer. The public MolCurator tool signatures are unchanged.
+The local validation report is in [reports/local_xtb_validation_20261021](../reports/local_xtb_validation_20261021/README.md). Changes are published on the tool branch; main is unchanged.
+
+
+## Pre-validation: stop the failed molecule before electronic work
+
+The PREDICT adapter checks each molecule before any xTB launch:
+
+1. Parse one connected SMILES and reject unsupported net charges or radical electrons.
+2. Generate ETKDG conformers. An embedding exception or zero conformers ends that molecule's pipeline.
+3. Optimize with MMFF94. Missing parameters or zero finite, converged minima ends that molecule's pipeline.
+4. Select the lowest-energy converged minimum, export XYZ, and verify the file, atom count, element symbols and finite coordinates.
+5. Only after these checks may an xTB single point or a verified cache lookup proceed. Successful predictions can be forwarded to ORCA VALIDATE.
+
+A failed molecule returns its original ID with `status=failed`, an error, and no predicted value or XYZ path. It makes **zero new electronic calls**. The remaining molecules continue; an individual preparation failure does not end the entire agent or batch. VALIDATE also rejects failed predictions before ORCA. Old successful attempt logs remain auditable, but stale published XYZ files are removed before retrying preparation.
+
+Each preparation creates `xyz/calculations/<id>/xtb/prevalidation/<event>.json` and updates `prevalidation.json` beside it. These contain status, stage, code, error and whether electronic work was allowed. The preparation record's `electronic_calls_attempted=0` refers to preparation only; actual later launches are counted in calculation attempt records and cumulative summaries.
+
+Machine-readable reasons include `invalid_or_disconnected_structure`, `unsupported_charge`, `unsupported_radical`, `embedding_failed`, `no_conformers`, `mmff_parameters_unavailable`, `no_converged_conformers`, `xyz_creation_failed`, `missing_xyz`, `xyz_write_failed`, `missing_xyz_file`, and `invalid_xyz`. Unexpected preparation exceptions use `geometry_preparation_failed`. A successful gate reports `geometry_ready`.
+
+CSV exports include `prevalidation_status`, `prevalidation_stage`, `prevalidation_code`, `prevalidation_error`, `input_formal_charge`, and `input_radical_electrons`. Unknown metadata in older runs is blank. No radical repair, charge neutralization, alternate force field, or automatic infinite retry is performed.
