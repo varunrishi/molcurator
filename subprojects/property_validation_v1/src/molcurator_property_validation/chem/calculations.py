@@ -4,6 +4,8 @@ import os
 import re
 import shutil
 import subprocess
+import signal
+import time
 from pathlib import Path
 
 NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][-+]?\d+)?"
@@ -30,16 +32,53 @@ def run(binary_env: str, fallback: str, args: list[str], folder: Path, log: Path
     resolved = shutil.which(executable)
     if resolved is None:
         raise FileNotFoundError(f"{binary_env}: executable not found: {executable}")
-    timeout = float(os.environ.get("MOLCURATOR_QC_TIMEOUT_S", "600"))
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("MOLCURATOR_QC_TIMEOUT_S must be positive and finite")
+    from .settings import active_settings, load_settings
+    from .tracking import atomic_json
+    settings = active_settings.get() or load_settings()
+    timeout = settings.timeout_s
     env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
-    with log.open("w") as output:
-        result = subprocess.run([str(Path(resolved).resolve()), *args], cwd=folder,
-                                stdout=output, stderr=subprocess.STDOUT,
-                                timeout=timeout, env=env, check=False)
-    if result.returncode:
-        raise RuntimeError(f"{fallback} exited with code {result.returncode}; see {log}")
+    state = dict(process_started=False, electronic_calls_attempted=0, timed_out=False,
+                 runtime_s=0.0, returncode=None)
+    process_record = folder / "process.json"
+    atomic_json(process_record, state)
+    started = time.monotonic()
+    try:
+        with log.open("w") as output:
+            process = subprocess.Popen([str(Path(resolved).resolve()), *args], cwd=folder,
+                                       stdout=output, stderr=subprocess.STDOUT, env=env,
+                                       start_new_session=(os.name != "nt"))
+            state.update(process_started=True, electronic_calls_attempted=1, pid=process.pid)
+            atomic_json(process_record, state)
+            try:
+                state["returncode"] = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                state["timed_out"] = True
+                if os.name != "nt":
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                else:
+                    process.kill()
+                process.wait()
+                state["returncode"] = process.returncode
+                raise
+            except BaseException:
+                if os.name != "nt":
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                else:
+                    process.kill()
+                process.wait()
+                state["returncode"] = process.returncode
+                raise
+        if state["returncode"]:
+            raise RuntimeError(f"{fallback} exited with code {state['returncode']}; see {log}")
+    finally:
+        state["runtime_s"] = time.monotonic() - started
+        atomic_json(process_record, state)
 
 
 def xtb_gap(text: str) -> float:

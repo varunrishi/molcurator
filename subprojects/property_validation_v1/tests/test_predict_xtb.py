@@ -21,8 +21,8 @@ def test_mixed_results_preserve_ids_geometry_and_weight(tmp_path,monkeypatch):
     monkeypatch.setattr(module,"lowest_ff_conformer",lambda s:(XYZ,REPORT.copy()))
     calls=[]
     def run(env,b,args,folder,log):
-        calls.append(folder.parent.name)
-        if folder.parent.name=="bad":raise RuntimeError("xTB failed")
+        calls.append(folder.parents[2].name)
+        if folder.parents[2].name=="bad":raise RuntimeError("xTB failed")
         log.write_text(LOG)
         assert "--opt" not in args
     monkeypatch.setattr(module,"run",run)

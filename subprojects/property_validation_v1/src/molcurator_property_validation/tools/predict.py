@@ -5,6 +5,8 @@ from pathlib import Path
 
 from molcurator_property_validation.chem.calculations import require_gap_target, run, safe_id, xtb_gap
 from molcurator_property_validation.chem.geometry import lowest_ff_conformer, xyz_symbols
+from molcurator_property_validation.chem.settings import load_settings
+from molcurator_property_validation.chem.tracking import calculate
 from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status
 
 
@@ -38,9 +40,11 @@ def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) 
                 "sampled converged FF minima. This is conditional on the sampled "
                 "conformer set and force-field energy model. The selected geometry "
                 "is used unchanged for xTB and ORCA single-point calculations.\n")
-            run("XTB_BIN", "xtb", ["initial.xyz", "--gfn", "2",
-                                  "--chrg", "0", "--uhf", "0"], folder, folder / "xtb.out")
-            value = xtb_gap((folder / "xtb.out").read_text(errors="replace"))
+            value = calculate(
+                folder, "xtb", ["initial.xyz", "--gfn", "2", "--chrg", "0", "--uhf", "0"],
+                {"initial.xyz": initial.read_bytes()}, xtb_gap, run, load_settings(),
+                dict(candidate_id=candidate.id, smiles=candidate.smiles,
+                     geometry_policy="single_point_on_selected_mmff94_geometry"))
             if not xyz_symbols(initial):
                 raise ValueError("invalid selected MMFF94 geometry")
             shutil.copyfile(initial, output)

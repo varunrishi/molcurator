@@ -16,10 +16,12 @@ def prediction(folder,cid):
 def test_configured_method_mixed_failures_ids_and_attempts(tmp_path,monkeypatch):
     calls=[]
     def run(env,b,args,folder,log):
-        calls.append(folder.parent.name)
+        calls.append(folder.parents[2].name)
         assert "PBE0 def2-TZVP" in (folder/"gap.inp").read_text()
         assert (folder/"geometry.xyz").read_text()==XYZ
-        if folder.parent.name=="bad":raise RuntimeError("failed process")
+        if folder.parents[2].name=="bad":
+            (folder/"process.json").write_text(json.dumps(dict(process_started=True, electronic_calls_attempted=1)))
+            raise RuntimeError("failed process")
         log.write_text(LOG)
     monkeypatch.setattr(module,"run",run)
     items=[prediction(tmp_path,"good"),prediction(tmp_path,"bad"),Prediction(candidate_id="prior-fail",status=Status.failed,error="xTB"),prediction(tmp_path,"last")]

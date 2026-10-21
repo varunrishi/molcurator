@@ -1,0 +1,14 @@
+{
+  "nconfs": 30,
+  "random_seed": 42,
+  "mmff_max_iterations": 500,
+  "mmff_force_tolerance": 0.0001,
+  "mmff_energy_tolerance": 0.000001,
+  "temperature_k": 298.15,
+  "rms_cutoff_angstrom": 0.25,
+  "orca_nprocs": 1,
+  "orca_maxcore_mb": 2000,
+  "timeout_s": 600,
+  "cache_enabled": true,
+  "cache_epoch": "1"
+}

@@ -33,7 +33,7 @@ def test_public_validate_delegates(monkeypatch):
 def test_public_workflow_preserves_ids_failures_and_geometry(tmp_path,monkeypatch):
     monkeypatch.setattr(xtb,'lowest_ff_conformer',lambda s:(XYZ,REPORT.copy()))
     def xtb_run(env,b,args,folder,log):
-        if folder.parent.name=='bad':raise RuntimeError('xTB failed')
+        if folder.parents[2].name=='bad':raise RuntimeError('xTB failed')
         log.write_text('GEOMETRY OPTIMIZATION CONVERGED\nHOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n')
         assert '--opt' not in args
     def orca_run(env,b,args,folder,log):
@@ -45,8 +45,8 @@ def test_public_workflow_preserves_ids_failures_and_geometry(tmp_path,monkeypatc
     candidates=[Candidate(id=i,smiles='CCO',parent_smiles='CCO',round=1,generator='test') for i in ('good','bad')]
     predictions=public_predict.predict(candidates,TARGET,tmp_path/'xyz')
     assert [p.candidate_id for p in predictions]==['good','bad']
-    assert [p.status for p in predictions]==[Status.ok,Status.failed]
+    assert [p.status for p in predictions]==[Status.ok,Status.failed], predictions
     results=public_validate.validate(predictions,TARGET,QMSettings(functional='PBE0',basis='def2-TZVP'))
     assert [r.candidate_id for r in results]==['good','bad']
-    assert [r.status for r in results]==[Status.ok,Status.failed]
+    assert [r.status for r in results]==[Status.ok,Status.failed], results
     assert results[0].value==3.5 and results[0].method=='dft:PBE0/def2-TZVP'
