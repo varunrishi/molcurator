@@ -33,7 +33,8 @@ def test_presets_are_offered(client):
     presets = {p["name"]: p for p in client.get("/api/presets").json()}
     assert presets["homo_lumo"]["supported"] is True
     assert presets["tadf"]["supported"] is True  # runs need ORCA: see preflight
-    assert presets["homo_lumo"]["notes"]  # the shipped seed is marked PLACEHOLDER
+    assert len(presets["homo_lumo"]["config"]["seeds"]) == 10  # read from data/seeds/homo_lumo.csv (seeds_file)
+    assert not presets["homo_lumo"]["notes"] and presets["tadf"]["notes"]  # only tadf's seed is a PLACEHOLDER
 
 
 def test_validate_reports_problems_and_warnings(client):
