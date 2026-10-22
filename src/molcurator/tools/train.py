@@ -669,9 +669,13 @@ def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Pa
         card["warnings"] = [str(w.message) for w in caught]
         (model_dir / "report_card.json").write_text(json.dumps(card, indent=2), encoding="utf-8")
     test, base = card["test_metrics"]["random_forest"], card["test_metrics"]["mean_baseline"]
+    split = card["partition"]["actual"]
     metrics = {"test_mae": test["mae"], "test_rmse": test["rmse"], "test_r2": test["r2"],
-               "baseline_mae": base["mae"], "go": float(card["go"])}
-    return TrainResult(model_path=Path(card["paths"]["model"]), n_examples=card["partition"]["actual"]["train"],
+               "baseline_mae": base["mae"], "go": float(card["go"]),
+               # the model is fitted on n_train; the split always keeps >= 1 back as a screening pool
+               "n_train": float(split["train"]), "n_test": float(split["test"]), "n_pool": float(split["pool"])}
+    # n_examples is every xTB value TRAIN was given (the contract, as the fakes and trace evaluator read it)
+    return TrainResult(model_path=Path(card["paths"]["model"]), n_examples=len(examples),
                        metrics={k: v for k, v in metrics.items() if np.isfinite(v)})  # NaN is not valid JSON
 
 
