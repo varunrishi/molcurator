@@ -30,6 +30,17 @@ curl -L -o data/seeds/qm9.csv \
   https://deepchemdata.s3.us-west-1.amazonaws.com/datasets/qm9.csv
 ```
 
+`molcurator seeds` downloads it there on first use, and suggests seeds from it for any QM9
+property when you have no seed of your own:
+
+```sh
+molcurator seeds --property gap --min 3.0 --max 3.5 --n 5    # gap/homo/lumo in eV
+molcurator seeds --property mu --min 5 --out my_seeds.csv     # dipole (D), one-sided
+```
+
+It applies the same filter and spread-across-the-window selection as the notebook
+(`src/molcurator/chem/qm9.py`), one seed per equal-width bin of the window.
+
 That URL is DeepChem's public MoleculeNet mirror. The dataset itself is Ramakrishnan, Dral,
 Rupp & von Lilienfeld, *Scientific Data* **1**, 140022 (2014) - the GDB-9 subset, on
 figshare. Cite the paper; the URL is only the access route. On download it had 133,885 rows
