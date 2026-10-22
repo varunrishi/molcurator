@@ -94,6 +94,17 @@ def test_predict_level_options_reach_predict_and_are_checked(tmp_path, source, t
     assert len(tools) == 2 and not (tmp_path / "r2").exists()
 
 
+def test_batch_target_name_and_units_are_checked(tmp_path, source, tools, capsys):
+    run = ["run", str(source), "--no-plots", "--out"]
+    assert cli.main([*run, str(tmp_path / "a"), "--property", "gap"]) == 2
+    assert "--property 'gap'" in capsys.readouterr().err
+    assert cli.main([*run, str(tmp_path / "b"), "--property", "dipole_moment", "--units", "eV"]) == 2
+    assert "--units 'eV'" in capsys.readouterr().err
+    cli.main([*run, str(tmp_path / "c"), "--property", "dipole_moment", "--min", "2"])
+    assert json.loads((tmp_path / "c/results.json").read_text())["target"]["units"] == "debye"
+    assert len(tools) == 2  # only run "c" reached PREDICT (two molecules)
+
+
 def test_changed_resume_input_is_rejected(tmp_path, source, tools):
     args = ["run", str(source), "--out", str(tmp_path / "run"), "--no-plots"]
     cli.main(args)

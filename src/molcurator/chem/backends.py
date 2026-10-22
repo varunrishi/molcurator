@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from molcurator.chem import orca, xtb
+from molcurator.chem.properties import SCALAR_PROPERTIES, canonical_property
 from molcurator.chem.settings import ChemistrySettings
 
 # xTB methods ORCA can run itself (GFN2/GFN1); IPEA1-xTB has no ORCA equivalent.
@@ -35,6 +36,30 @@ def backend_for(method: str) -> str:
     if not xtb.is_xtb(method):
         return "orca"
     return "xtb" if tblite_error() is None else "orca"
+
+
+# Accepted spellings of each tool unit, compared case-insensitively.
+_UNIT_SPELLINGS = {"ev": {"ev"}, "debye": {"debye", "d"}, "eh": {"eh", "hartree", "ha", "au", "a.u."},
+                   "bohr^3": {"bohr^3", "bohr**3", "bohr3", "au", "a.u."}, "": {"", "dimensionless", "none", "-"}}
+
+
+def check_target(name: str, units: str | None) -> str:
+    """The units for a run or batch target, after checking that name is a single-number property
+    the tools compute. units None: the property's own unit. A unit that does not match the
+    property is refused, since the target window must be in the unit the tools return."""
+    if name not in SCALAR_PROPERTIES:
+        hint = canonical_property(name)
+        suggestion = f" Did you mean {hint!r}?" if hint != name and hint in SCALAR_PROPERTIES else ""
+        raise ValueError(f"target {name!r} is not a single-number property the tools compute.{suggestion} "
+                         f"Choose from: {', '.join(SCALAR_PROPERTIES)}")
+    unit = orca.PROPERTIES[name].unit
+    if units is None:
+        return unit
+    if units.strip().lower() in _UNIT_SPELLINGS.get(unit.lower(), {unit.lower()}):
+        return units
+    raise ValueError(f"target units {units!r} do not match {name}, which the tools compute in "
+                     f"{unit or 'no unit (dimensionless)'}: give the window in {unit or 'plain numbers'} "
+                     "and set units to that, or leave units out to use it")
 
 
 def xtb_validation_message(method: str) -> str | None:

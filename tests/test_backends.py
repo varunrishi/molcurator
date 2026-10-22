@@ -89,3 +89,33 @@ def test_predict_runs_on_the_fallback(tmp_path, no_tblite):
     assert result.status is Status.ok, result.error
     record = json.loads((tmp_path / "calculations/eth/predict.json").read_text())
     assert record["backend"] == "orca" and record["method_label"] == "xtb:GFN2-xTB"
+
+
+# --- run and batch targets: single-number properties, in the tools' units ---
+
+@pytest.mark.parametrize(("name", "units", "expected"), [
+    ("homo_lumo_gap", None, "eV"), ("dipole_moment", None, "debye"), ("dipole_moment", "D", "D"),
+    ("energy", "hartree", "hartree"), ("polarizability", "bohr^3", "bohr^3"), ("g_tensor", None, ""),
+])
+def test_target_units_are_filled_in_or_accepted(name, units, expected):
+    assert backends.check_target(name, units) == expected
+
+
+@pytest.mark.parametrize(("name", "units", "message"), [
+    ("gap", None, "Did you mean 'homo_lumo_gap'"),
+    ("frequencies", None, "not a single-number property"),
+    ("dipole_moment", "eV", "computes? in debye|compute in debye"),
+    ("homo_lumo_gap", "kcal/mol", "compute in eV"),
+])
+def test_unusable_targets_are_refused(name, units, message):
+    with pytest.raises(ValueError, match=message):
+        backends.check_target(name, units)
+
+
+def test_run_config_checks_target_and_fills_units():
+    seeds = {"seeds": ["CCO"]}
+    assert RunConfig.model_validate({**seeds, "target": {"name": "dipole_moment", "min": 2}}).target.units == "debye"
+    with pytest.raises(ValueError, match="compute in debye"):
+        RunConfig.model_validate({**seeds, "target": {"name": "dipole_moment", "min": 2, "units": "eV"}})
+    with pytest.raises(ValueError, match="Did you mean 'homo_lumo_gap'"):
+        RunConfig.model_validate({**seeds, "target": {"name": "gap", "min": 3}})

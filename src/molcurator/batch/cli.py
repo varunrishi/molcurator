@@ -36,7 +36,7 @@ def main(argv=None) -> int:
     run.add_argument("--out", type=Path, required=True, help="new output directory (existing with --resume)")
     run.add_argument("--resume", action="store_true")
     run.add_argument("--property", default="homo_lumo_gap", help="target property (default homo_lumo_gap)")
-    run.add_argument("--units", default="eV")
+    run.add_argument("--units", help="unit of --min/--max; default: the property's own (checked)")
     run.add_argument("--predict-method", help="PREDICT method; default GFN2-xTB, or B97-3c when xTB cannot give it")
     run.add_argument("--predict-basis", help="PREDICT basis set, for methods without their own (default def2-SVP)")
     run.add_argument("--orca", action="store_true", help="QM-validate successful predictions inside the window")

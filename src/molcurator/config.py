@@ -109,6 +109,15 @@ class RunConfig(StrictModel):
     rng_seed: int = 0  # passed to generate, so a run is repeatable (R7.2)
 
     @model_validator(mode="after")
+    def _target_is_a_property(self) -> "RunConfig":
+        # A target the tools cannot compute, or a window in the wrong unit, would only fail (or
+        # mislead) once PREDICT runs; checked here instead. Units left out take the property's own.
+        from molcurator.chem.backends import check_target
+        given = self.target.units if "units" in self.target.model_fields_set else None
+        self.target.units = check_target(self.target.name, given)
+        return self
+
+    @model_validator(mode="after")
     def _predict_level_works(self) -> "RunConfig":
         # Checked here, so an impossible PREDICT level stops the run before any calculation.
         from molcurator.tools.predict import check_predict_level

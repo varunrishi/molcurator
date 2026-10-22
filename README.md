@@ -170,6 +170,13 @@ qm:
   basis: def2-SVP
 ```
 
+**Targets.** `target.name` can be any single-number property the tools compute: `homo_lumo_gap`,
+`s1_t1_gap`, `s1_energy`, `t1_energy`, `s0_t1_gap`, `ionization_potential`, `electron_affinity`,
+`dipole_moment`, `polarizability`, `g_tensor`, `energy` or `thermochemistry`. Give the window in that
+property's unit (eV for gaps and excitation energies, debye, bohr^3, Eh). `target.units` can be left out
+and is filled in. A name the tools do not compute, or a unit that does not match, is refused when the
+config loads.
+
 **Levels of theory.** VALIDATE uses `qm.functional` / `qm.basis`. PREDICT defaults to GFN2-xTB, or
 B97-3c TD-DFT for targets xTB cannot give (S1-T1); set `predict.method` / `predict.basis` to change it:
 

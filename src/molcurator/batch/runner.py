@@ -13,7 +13,6 @@ from pathlib import Path
 
 from molcurator.batch.inputs import read_candidates
 from molcurator.batch.runtime import check_allocation, run_lock
-from molcurator.chem.properties import SCALAR_PROPERTIES
 from molcurator.chem.settings import active_settings, load_settings
 from molcurator.fileio import atomic_json, native_path
 from molcurator.schemas import PropertyTarget, QMSettings, Status
@@ -23,13 +22,16 @@ SCHEMA_VERSION = 2
 
 def _target(args) -> PropertyTarget:
     """The target the tools receive. They read only its name; the window is applied here."""
-    if args.property not in SCALAR_PROPERTIES:
-        raise ValueError(f"--property must be one of {', '.join(SCALAR_PROPERTIES)}")
+    from molcurator.chem.backends import check_target
+    try:
+        units = check_target(args.property, args.units)
+    except ValueError as exc:  # same check as a run config, named after this command's options
+        raise ValueError(str(exc).replace("target units", "--units").replace("target ", "--property ", 1)) from exc
     if any(v is not None and not math.isfinite(v) for v in (args.min, args.max)):
         raise ValueError("--min and --max must be finite")
     if args.min is None and args.max is None:  # no window: every successful prediction is selected
-        return PropertyTarget(name=args.property, min=-math.inf, units=args.units)
-    return PropertyTarget(name=args.property, min=args.min, max=args.max, units=args.units)
+        return PropertyTarget(name=args.property, min=-math.inf, units=units)
+    return PropertyTarget(name=args.property, min=args.min, max=args.max, units=units)
 
 
 def run_batch(args, *, predict_fn, validate_fn) -> int:
