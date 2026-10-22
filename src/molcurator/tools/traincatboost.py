@@ -154,6 +154,7 @@ def _fit_catboost(seed: int, fast: bool, verbose: bool = False) -> Any:
         eval_metric="MAE",
         random_seed=seed,
         verbose=verbose,
+        allow_writing_files=False,  # no catboost_info/ training logs in the working directory
         # Virtual ensembles enable per-sample uncertainty without a separate
         # calibration model.  num_trees=10 is a light default; increase for
         # better calibration at the cost of prediction time.
