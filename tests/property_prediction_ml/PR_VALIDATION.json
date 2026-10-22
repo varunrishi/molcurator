@@ -1,0 +1,19 @@
+{
+  "base_commit": "3da5601",
+  "pytest": "4 passed; includes 16 routing/calibration invariants",
+  "cli_checks": [
+    {
+      "model": "random",
+      "return_code": 0,
+      "summary": "6 rows; 1 ML accepted; 2 physical routes; physical execution False"
+    },
+    {
+      "model": "scaffold",
+      "return_code": 0,
+      "summary": "6 rows; 2 ML accepted; 1 physical routes; physical execution False"
+    }
+  ],
+  "new_electronic_calls": 0,
+  "scope": "isolated tests/property_prediction_ml study; no shared tool modifications",
+  "environment": "Python 3.11.17; version-pinned local RDKit, NumPy, scikit-learn and joblib; no fresh pip install tested"
+}

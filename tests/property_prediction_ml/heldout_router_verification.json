@@ -1,0 +1,12 @@
+{
+  "random": {
+    "n": 143,
+    "all_routes_match": true,
+    "all_predictions_intervals_match": true
+  },
+  "scaffold": {
+    "n": 144,
+    "all_routes_match": true,
+    "all_predictions_intervals_match": true
+  }
+}
