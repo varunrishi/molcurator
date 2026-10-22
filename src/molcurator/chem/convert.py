@@ -71,15 +71,28 @@ def _has_strained_fused_ring(rings: tuple[tuple[int, ...], ...], min_fused: int)
                for r in rings)
 
 
+def _hypervalent_sulfur(atom: Chem.Atom) -> bool:
+    """Sulfur with more than its two ordinary bonds, other than to double-bonded oxygen as in sulfoxides
+    S(=O) and sulfones S(=O)(=O). SELFIES edits make S(IV)/S(VI) species such as [SH] in rings, C=S in
+    small rings or three-bonded S; xTB gives them near-zero gaps, which looked like hits (2026-10-22)."""
+    if atom.GetSymbol() != "S":
+        return False
+    oxo = sum(1 for b in atom.GetBonds()
+              if b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(atom).GetSymbol() == "O")
+    return atom.GetTotalValence() - 2 != 2 * oxo
+
+
 def is_implausible(smiles: str, max_ring: int = 8, min_fused_ring: int = 5) -> bool:
     """True for structures that random SELFIES edits produce often but chemists rarely want:
-    radicals, rings larger than max_ring, small rings fused onto another ring, triple bonds
-    inside rings, and cumulated double bonds."""
+    radicals, hypervalent sulfur, rings larger than max_ring, small rings fused onto another ring,
+    triple bonds inside rings, and cumulated double bonds."""
     mol = Chem.MolFromSmiles(smiles)
     # Radicals: SELFIES never adds H to a bracket atom, so a parent's [nH] token ([NH1]) left
     # with one bond after an edit decodes to an aminyl radical. Sanitisation accepts it, but
     # PREDICT takes closed-shell molecules only.
     if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return True
+    if any(_hypervalent_sulfur(a) for a in mol.GetAtoms()):
         return True
     rings = mol.GetRingInfo().AtomRings()  # mol must stay referenced: RingInfo does not own it
     if any(len(r) > max_ring for r in rings):

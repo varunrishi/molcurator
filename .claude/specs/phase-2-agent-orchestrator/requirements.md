@@ -137,6 +137,14 @@ output) and asks for a structured answer validated against a Pydantic model.
   failures instead of dropping them (R1.6, R2.4).
 - R10.5 Without a trained model yet, candidates without an xTB value cannot be screened. They
   get the final status `unscored` and are never selected for QM or curated.
+- R10.6 With `predict.correction` in the run config, the end of PREDICT corrects each calculated
+  xTB value to a DFT-like one, `slope * xTB + intercept`, fitted on paired xTB/DFT gaps
+  (`scripts/fit_xtb_correction.py`; 60 xTB/B3LYP/def2-SVP pairs give 0.6915 and 3.2347, error
+  2.23 -> 0.37 eV). Everything after PREDICT (TRAIN's data, ML, SCREEN, the decisions, CURATE)
+  uses the corrected value, and the user's target window is read as DFT-like. The calculated value
+  is kept as `xtb_raw`; a value outside the fit's xTB range is marked `xtb_extrapolated`. The
+  correction applies to `homo_lumo_gap` targets only; a config pairing it with another target is
+  rejected. (Added 2026-10-22: raw xTB gaps are ~2.2 eV below B3LYP ones.)
 
 ## R11 — Optional QM validation and curation
 - R11.1 QM validation runs only when the run config has a `qm:` section naming the method
@@ -150,10 +158,11 @@ output) and asks for a structured answer validated against a Pydantic model.
 - R11.2 CURATE adds the molecules whose best estimate lies inside the target window (no
   screening margin), where best means QM if available, else xTB, else ML. With QM on, only
   QM-validated molecules qualify; with QM off, screened-in molecules qualify on their xTB or
-  ML value.
+  ML value. A molecule known only from an extrapolated corrected xTB value (R10.6) is not
+  curated; a QM value, when there is one, still decides.
 - R11.3 Each curated entry records the molecule's id, SMILES, structure (XYZ geometry when it
   has one) and its property value at every level it has (ML, xTB, QM), plus whether it was
-  QM-validated. The CURATE tool writes the dataset as a table, e.g. CSV, in the run folder.
+  QM-validated. With a correction, it also records the calculated `xtb_raw` and `xtb_extrapolated`. The CURATE tool writes the dataset as a table, e.g. CSV, in the run folder.
 
 ## Cross-cutting
 - R9.1 The decision model comes from `LLM_PROVIDER` (`anthropic` default, or `openai` for an

@@ -6,6 +6,17 @@
 
 MolCurator is an AI agent that creates and curates a benchmark set of molecules, starting from a seed molecule with a desired property.
 
+## Contents
+- [Idea](#idea)
+- [Approach](#approach)
+- [Tools](#tools)
+- [Installation](#installation)
+- [Running the agent](#running-the-agent)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [References](#references)
+
 ## Idea
 
 Given a seed molecule and a target property (e.g. a HOMO-LUMO gap range), the agent generates candidate molecules, screens them with fast ML predictions, confirms the promising ones with quantum chemistry, and assembles a curated benchmark dataset of molecules that actually have the desired property.
@@ -200,6 +211,16 @@ With QM on:
 
 `enabled: false` keeps the section but skips QM.
 
+**xTB gaps are corrected to DFT-like values.** Raw GFN2-xTB HOMO-LUMO gaps are about 2.2 eV below
+B3LYP ones. With a `predict.correction` block, as in `configs/homo_lumo.yaml`, PREDICT turns each
+calculated value into `slope × xTB + intercept`. Everything after PREDICT then works in DFT-like units,
+including TRAIN's data, and so does the target window: 4.0–4.5 eV in `homo_lumo.yaml`.
+- `scripts/fit_xtb_correction.py` fits the line on paired gaps in `data/properties/`. 60
+  xTB/B3LYP/def2-SVP pairs cut the error from 2.23 to 0.37 eV.
+- The calculated value is kept as `xtb_raw`.
+- Values outside the fitted xTB range are marked `xtb_extrapolated` and are not curated on their own.
+- The correction is for `homo_lumo_gap` targets only.
+
 Each step prints a line when it finishes:
 
 ```
@@ -230,7 +251,7 @@ summary.
 
 | File | Contents |
 |---|---|
-| `dataset.csv` | the curated molecules: id, SMILES, XYZ path, values at each level (`ml`, `xtb`, `qm` with `qm_method`), whether QM-validated, and provenance (parent, round, generator, seeds) |
+| `dataset.csv` | the curated molecules: id, SMILES, XYZ path, values at each level (`ml`, `xtb`, `qm` with `qm_method`), whether QM-validated, and provenance (parent, round, generator, seeds). With `predict.correction`, `xtb` is the DFT-like corrected value, `xtb_raw` the value xTB calculated, and `xtb_extrapolated` marks raw values outside the correction's fitted range |
 | `dataset_ml_only.csv` | the curated molecules that have only an ML value (no xTB or QM): id, SMILES, `ml` and provenance. Written once at the end of the run, from `dataset.csv` |
 | `xyz/` | the MMFF94 geometries PREDICT and VALIDATE computed at; `xyz/calculations/<id>/` holds each molecule's geometry report, `predict.json` and `validate.json` records and ORCA files |
 | `models/` | trained ML models, one folder per round |
@@ -322,6 +343,7 @@ scripts/         helper scripts
 demo/            presentation and video assets
 assets/          logo and README images
 ```
+
 ## Troubleshooting
 
 - **xTB not available:** xTB runs through tblite, a Python dependency (`uv sync`; on Windows, `environment.yml`). Without tblite, GFN2-/GFN1-xTB fall back to ORCA's built-in xTB. `python scripts/check_property_tools.py` reports which engine is used.

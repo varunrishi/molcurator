@@ -1,17 +1,25 @@
-# Use case 1: molecules with a HOMO-LUMO gap in a target window (eV), judged at the QM level.
+# Use case 1: molecules with a HOMO-LUMO gap in a target window (eV), judged at the DFT (B3LYP) level:
+# PREDICT's xTB gaps are corrected to DFT-like values (predict.correction) before anything compares them.
 # Read by molcurator.config.load_config; anything omitted uses the defaults in config.py.
-target:
+target:  # DFT-like: small conjugated molecules sit at ~4-7 eV at B3LYP (3.0-3.5 eV only drew xTB artifacts)
   name: homo_lumo_gap
-  min: 3.0
-  max: 3.5
+  min: 4.0
+  max: 4.5
 seeds:
   - "c1ccc(-c2cccs2)s1"  # PLACEHOLDER: 2,2'-bithiophene; replace with the real seed molecule
 screening:
-  margin: 0.2  # xTB screen accepts 2.8-3.7 eV (xTB is systematically offset from QM)
-# PREDICT's level of theory; default GFN2-xTB. Uncomment to change it, e.g. GFN1-xTB or a DFT method.
-# predict:
-#   method: gfn1-xtb
-#   basis: def2-SVP   # only for methods without their own basis (not xTB or -3c)
+  margin: 0.5  # screen accepts 3.5-5.0 eV of corrected xTB: about the correction's typical error (0.46 eV)
+predict:
+  correction:  # on-top correction of GFN2-xTB gaps to B3LYP/def2-SVP (scripts/fit_xtb_correction.py)
+    slope: 0.6915
+    intercept: 3.2347
+    residual_sd: 0.455
+    xtb_range: [1.02, 8.84]  # fitted xTB gaps; outside this the correction extrapolates
+    fitted_on: "60 xTB/B3LYP/def2-SVP pairs, b3lyp_validation60"
+  # PREDICT's level of theory; default GFN2-xTB, which the correction above is fitted for.
+  # Another method (e.g. GFN1-xTB or a DFT method) needs its own correction, or none:
+  # method: gfn1-xtb
+  # basis: def2-SVP   # only for methods without their own basis (not xTB or -3c)
 # Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.
 # The functional must be DFT (or HF), not xTB: PREDICT already uses GFN2-xTB here.
 # qm:

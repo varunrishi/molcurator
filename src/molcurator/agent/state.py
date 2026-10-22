@@ -17,7 +17,9 @@ class MoleculeRecord(TypedDict):
     round: int
     parent: str  # SMILES it was generated from
     status: MoleculeStatus
-    xtb: float | None  # PREDICT value
+    xtb: float | None  # PREDICT value; DFT-like when the config has predict.correction
+    xtb_raw: float | None  # the xTB value as calculated (equal to xtb without a correction)
+    xtb_extrapolated: bool | None  # xtb_raw outside the correction's fitted range: a less certain xtb
     ml: float | None  # ML PREDICT estimate (R10.4)
     qm: float | None  # VALIDATE value
     qm_method: str | None  # level of theory named by VALIDATE, e.g. "dft:B3LYP/def2-SVP"; CURATE's key

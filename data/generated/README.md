@@ -17,5 +17,7 @@ Settings: `GenerationSettings(n_candidates=100, mutation_strength=2)`, `round=1`
 **Requires the ring-preservation rule in `tools/generate.py`** (branch `tools/generate`).
 Generated on `main` without it, the candidates differ sharply: 15% aromatic instead of 90%.
 
-Of these 1000: 947 unique SMILES (a few are reachable from two different seeds), 90% contain
-an aromatic ring, 92% would pass the chemical filter used to select the seeds themselves.
+Of these 1000: 953 unique SMILES (a few are reachable from two different seeds), 90% contain
+an aromatic ring, 93% would pass the chemical filter used to select the seeds themselves, and
+none is a radical. **Requires the radical check in `chem.convert.is_implausible`**: generated
+without it, 42 candidates (35 from s04) were aminyl radicals that PREDICT cannot take.

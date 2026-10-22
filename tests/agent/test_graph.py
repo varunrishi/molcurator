@@ -14,6 +14,17 @@ from tests.agent.fakes import FakeTools
 CONFIG = Path(__file__).parents[2] / "configs" / "homo_lumo.yaml"  # independent of pytest's working directory
 
 
+def raw_config() -> RunConfig:
+    """The shipped HOMO-LUMO config, without predict.correction and with the 3.0-3.5 eV window (margin 0.2) the
+    fake tools' values (centred on 3.25) were designed for: these tests check the flow, independent of the
+    shipped window; test_xtb_correction checks the correction."""
+    data = load_config(CONFIG).model_dump()
+    data["predict"]["correction"] = None
+    data["target"].update(min=3.0, max=3.5)
+    data["screening"]["margin"] = 0.2
+    return RunConfig.model_validate(data)
+
+
 class FakeToolsRealCurate(FakeTools):
     """Fake chemistry, real CURATE: the end-of-run export reads the real dataset.csv."""
     curate = staticmethod(curate)
@@ -21,7 +32,7 @@ class FakeToolsRealCurate(FakeTools):
 
 def run_graph(tmp_path, tools: FakeTools | None = None, n_candidates: int | None = None, **budget) -> dict:
     """Run the HOMO-LUMO config to the end and return the final state; overrides are re-validated."""
-    data = load_config(CONFIG).model_dump()
+    data = raw_config().model_dump()
     data["budget"].update(budget)
     if n_candidates is not None:
         data["generation"]["defaults"]["n_candidates"] = n_candidates
