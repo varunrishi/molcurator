@@ -424,6 +424,20 @@ def _orca_error(job: _Job) -> str:
     return lines[0] if lines else "ORCA did not terminate normally"
 
 
+# ORCA starts helper programs (orca_scf, mpirun, ...); each run gets its own process group
+# (POSIX) or process tree (Windows), so a timeout can stop all of them.
+_NEW_PROCESS_GROUP = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+                      else {"start_new_session": True})
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    if os.name == "nt":  # no process groups to signal: taskkill /T ends the whole child tree
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, check=False)
+    else:
+        os.killpg(proc.pid, signal.SIGKILL)
+    proc.wait()
+
+
 def _runner(install: _OrcaInstall, working_dir: Path):
     """OPI's Runner (it finds ORCA's bin/ and lib/ and Open MPI) with its own run():
 
@@ -465,12 +479,11 @@ def _runner(install: _OrcaInstall, working_dir: Path):
                                       cwd=cwd or self.working_dir, env=self._environment(), timeout=limit)
             with open(stdout or os.devnull, "w") as out, open(stderr or os.devnull, "w") as err:
                 proc = subprocess.Popen(command, stdout=out, stderr=err, cwd=cwd or self.working_dir,
-                                        env=self._environment(), start_new_session=True)
+                                        env=self._environment(), **_NEW_PROCESS_GROUP)
                 try:
                     proc.wait(timeout=limit)
                 except BaseException:  # timeout or interrupt: stop ORCA and every helper it started
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    proc.wait()
+                    _kill_tree(proc)
                     raise
             return None
 

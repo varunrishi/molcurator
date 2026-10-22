@@ -113,6 +113,32 @@ cp .env.example .env          # then set ORCA_BIN=/path/to/orca if you use ORCA
 
 On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically, but it leaves out OPI (`orca-pi` needs NumPy 2), so ORCA calculations are unavailable there.
 
+### Windows (and any machine, with conda)
+
+`scripts/setup.sh` is a bash script and `uv sync` cannot install xTB on Windows: tblite (xTB) has
+no Windows wheels on PyPI. [`environment.yml`](environment.yml) installs it from conda-forge
+instead, which has Windows builds, and then installs everything else from PyPI with pip:
+
+```bash
+conda env create -f environment.yml     # Miniforge: https://conda-forge.org/download/
+conda activate molcurator
+copy .env.example .env                  # PowerShell / cmd; cp on Linux and macOS
+```
+
+The same file works on Linux and macOS as an alternative to `uv sync`. tblite comes from
+conda-forge on every platform, and pip finds it already installed; outside conda, `pyproject.toml`
+installs tblite from PyPI on Linux and macOS. pip does not read `uv.lock`, so this environment gets
+the newest versions `pyproject.toml` allows rather than the locked ones.
+
+On Windows:
+
+- **ORCA**: install the Windows build, then set `ORCA_BIN` in `.env` to `orca.exe` or its folder.
+- **One ORCA core only**: keep `orca_nprocs: 1`. Parallel ORCA on Windows uses Microsoft MPI, which
+  the tools do not set up.
+- **Without tblite** (for example a plain `pip install -e .`), GFN2-xTB runs through ORCA's built-in xTB.
+- **Untested**: the conda packages and the code paths exist for Windows, but this setup has not been
+  run on a Windows machine yet.
+
 ### Optional
 
 - **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
