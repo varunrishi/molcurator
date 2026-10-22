@@ -496,6 +496,19 @@ def _check_version(install: _OrcaInstall) -> None:
     _runner(install, Path.cwd()).check_version()
 
 
+def _check_multiplicity(elements: list[str], charge: int, multiplicity: int) -> None:
+    """Raise ValueError for a spin state no molecule can have: the number of unpaired electrons
+    (multiplicity - 1) must match the parity of the electron count and not exceed it. Needs no ORCA,
+    so the error is the same on a machine without it; _run_job checks each run's charge again."""
+    from rdkit import Chem
+
+    table = Chem.GetPeriodicTable()
+    electrons = sum(table.GetAtomicNumber(e) for e in elements) - charge
+    unpaired = multiplicity - 1
+    if multiplicity < 1 or unpaired > electrons or (electrons - unpaired) % 2:
+        raise ValueError(f"multiplicity {multiplicity} is impossible for charge {charge} ({electrons} electrons)")
+
+
 def _run_job(run: _Run, spec: _Spec, setup: _Setup, elements: list[str], coordinates: list,
              folder: Path, install: _OrcaInstall, nprocs: int, maxcore_mb: int, timeout_s: int) -> _Job:
     from opi.core import Calculator
@@ -577,6 +590,7 @@ def calculate_property(
             raise ValueError(f"{key} needs an open-shell molecule (multiplicity > 1)")
         if not 1 <= nroots <= 50:
             raise ValueError("nroots must be between 1 and 50")
+        _check_multiplicity(elements, charge, multiplicity)  # before ORCA is even looked for
 
         orca_method, orca_basis, is_xtb = _resolve_method(method, basis, spec, notes, allow_upgrade)
         if orca_basis:
