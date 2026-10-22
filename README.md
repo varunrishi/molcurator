@@ -218,7 +218,7 @@ including TRAIN's data, and so does the target window: 4.0–4.5 eV in `homo_lum
 - `scripts/fit_xtb_correction.py` fits the line on paired gaps in `data/properties/`. 60
   xTB/B3LYP/def2-SVP pairs cut the error from 2.23 to 0.37 eV.
 - The calculated value is kept as `xtb_raw`.
-- Values outside the fitted xTB range are marked `xtb_extrapolated` and are not curated on their own.
+- Values outside the fitted xTB range are marked `xtb_extrapolated`; they are still curated when the corrected value is in the window, so the flag lets you filter them out.
 - The correction is for `homo_lumo_gap` targets only.
 
 Each step prints a line when it finishes:

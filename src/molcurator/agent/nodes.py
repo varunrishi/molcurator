@@ -146,16 +146,17 @@ def validate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
 
 
 def curate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
-    """CURATE: molecules whose best estimate (QM, else xTB, else ML) lies inside the target, with no
-    screening margin, join the dataset with a value at every level they have (R11.2, R11.3).
-    With QM on, only this round's QM-validated molecules qualify; with QM off, screened-in ones do.
-    A molecule known only from an extrapolated corrected xTB value (outside the correction's fitted
-    range) is not curated: that value is too uncertain. A QM value, when there is one, still decides."""
+    """CURATE: molecules join the dataset, with a value at every level they have (R11.2, R11.3), when
+    their xTB value lies inside the target (no screening margin), or else their best estimate does.
+    The xTB value is the corrected one when predict.correction is set, extrapolated or not (the
+    dataset flags it), and it qualifies whatever QM says and whether or not ML scored the molecule.
+    Best estimate: with QM on, this round's QM-validated molecules; with QM off, screened-in ones."""
     molecules = dict(state["molecules"])
+    inside = lambda v: v is not None and target_distance(v, config.target) <= 1e-9  # noqa: E731
     pool = ([molecules[i] for i in state["qm_batch"] if molecules[i]["status"] == "validated"] if config.qm.enabled
             else [m for m in molecules.values() if m["status"] == "screened_in"])
-    hits = [m for m in pool if target_distance(best_estimate(m), config.target) <= 1e-9
-            and not (m["qm"] is None and m.get("xtb_extrapolated"))]
+    by_xtb = [m for m in molecules.values() if m["status"] != "curated" and inside(m["xtb"])]
+    hits = list({m["id"]: m for m in by_xtb + [m for m in pool if inside(best_estimate(m))]}.values())
     if not hits:
         return {}
     levels = lambda m: {"ml": m["ml"], "xtb": m["xtb"], "xtb_raw": m.get("xtb_raw"), m["qm_method"]: m["qm"]}  # noqa: E731

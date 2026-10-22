@@ -60,14 +60,18 @@ def test_shipped_config_trains_and_curates_on_corrected_values(tmp_path):
         assert r["xtb_extrapolated"] == "False" and c.xtb_range[0] <= float(r["xtb_raw"]) <= c.xtb_range[1]
 
 
-def test_extrapolated_values_are_not_curated(tmp_path):
+def test_extrapolated_values_in_the_window_are_curated_and_flagged(tmp_path):
     """A window below the correction's fitted range (corrected < ~3.94 eV) is reached only by extrapolated values:
-    they are screened but too uncertain to curate. (ML-only molecules carry no flag and can still be.)"""
+    a corrected xTB value inside the window is curated anyway, and dataset.csv flags it as extrapolated.
+    The corrected value decides, not the raw one."""
     config, _, state = corrected_run(tmp_path, min=3.0, max=3.5)
     in_window = [m for m in state["molecules"].values()
                  if m["xtb"] is not None and config.target.min <= m["xtb"] <= config.target.max]
-    assert in_window and all(m["xtb_extrapolated"] and m["status"] != "curated" for m in in_window)
-    assert all(m["xtb"] is None for m in state["molecules"].values() if m["status"] == "curated")
+    assert in_window and all(m["xtb_extrapolated"] and m["status"] == "curated" for m in in_window)
+    assert not any(config.target.min <= m["xtb_raw"] <= config.target.max for m in in_window)  # raw is ~0.1-0.4 eV
+    with (tmp_path / "c" / "dataset.csv").open(newline="") as f:
+        flagged = {r["id"] for r in csv.DictReader(f) if r["xtb_extrapolated"] == "True"}
+    assert flagged == {m["id"] for m in in_window}
 
 
 def test_correction_is_rejected_for_other_properties():
