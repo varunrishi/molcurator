@@ -1,34 +1,39 @@
-/* config.js — namespace, persisted settings (API base URL, theme).
- * Everything attaches to a single global `MOL` so the modules load as ordered <script> tags
- * without a bundler. All localStorage access is wrapped (it can throw in private mode). */
+/* config.js — the web app's own settings, kept in this browser (localStorage).
+ * Everything attaches to one global `MOL`, so the scripts load as plain ordered <script> tags
+ * without a bundler. localStorage can throw (private mode, blocked storage), so every access
+ * is wrapped and the app works with the defaults when it is unavailable. */
 (function () {
   "use strict";
   window.MOL = window.MOL || {};
 
-  var KEY_API = "molc.apiBase";
-  var KEY_THEME = "molc.theme";
+  const PREFIX = "molc.";
+  const DEFAULT_REPO_URL = "https://github.com/varunrishi/molcurator"; // from the project README
 
-  function lsGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { return null; }
+  function read(key) {
+    try { return localStorage.getItem(PREFIX + key); } catch (e) { return null; }
   }
-  function lsSet(key, value) {
-    try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+  function write(key, value) {
+    try {
+      if (value === null || value === "") localStorage.removeItem(PREFIX + key);
+      else localStorage.setItem(PREFIX + key, value);
+    } catch (e) { /* storage unavailable: the setting lasts until the page is closed */ }
   }
 
+  // Served by the backend (http/https): talk to the same server. Opened from disk: a local default.
   function defaultApiBase() {
-    // Served over http(s): same origin (""). Opened from disk: a sensible local default.
-    if (location.protocol === "http:" || location.protocol === "https:") return "";
-    return "http://localhost:8000";
+    return location.protocol === "http:" || location.protocol === "https:" ? "" : "http://127.0.0.1:8000";
   }
 
   MOL.config = {
-    getApiBase: function () {
-      var v = lsGet(KEY_API);
-      return v === null ? defaultApiBase() : v;
-    },
-    setApiBase: function (value) { lsSet(KEY_API, value.trim()); },
+    DEFAULT_REPO_URL: DEFAULT_REPO_URL,
     defaultApiBase: defaultApiBase,
-    getTheme: function () { return lsGet(KEY_THEME); },
-    setTheme: function (value) { lsSet(KEY_THEME, value); }
+    apiBase: () => { const v = read("apiBase"); return v === null ? defaultApiBase() : v; },
+    token: () => read("token") || "",
+    repoUrl: () => read("repoUrl") || "",            // "" = use the server's or the default
+    pollSeconds: () => Math.max(2, parseInt(read("pollSeconds"), 10) || 5),
+    theme: () => read("theme"),
+    save: function (values) {                        // values: any of apiBase, token, repoUrl, pollSeconds, theme
+      Object.keys(values).forEach((k) => write(k, values[k] == null ? null : String(values[k]).trim()));
+    }
   };
 })();

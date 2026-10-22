@@ -1,28 +1,33 @@
-/* viewer.js — thin wrapper around 3Dmol.js for rendering an XYZ geometry. */
+/* viewer.js — thin wrapper around 3Dmol.js for showing an XYZ geometry. */
 (function () {
   "use strict";
   window.MOL = window.MOL || {};
 
-  function has3D() { return !!window.$3Dmol; }
+  const has3D = () => !!window.$3Dmol;
+
+  function clear(elementId, message) {
+    const host = document.getElementById(elementId);
+    if (host) host.innerHTML = '<div class="v3d-empty">' + MOL.ui.esc(message || "") + "</div>";
+  }
 
   function render(elementId, xyz) {
-    var host = document.getElementById(elementId);
+    const host = document.getElementById(elementId);
     if (!host) return null;
-    if (!has3D()) { host.innerHTML = '<div class="v3d-empty">3D viewer unavailable</div>'; return null; }
-    if (!xyz) { host.innerHTML = '<div class="v3d-empty">No geometry</div>'; return null; }
+    if (!has3D()) { clear(elementId, "3D viewer unavailable"); return null; }
+    if (!xyz) { clear(elementId, "No geometry"); return null; }
     host.innerHTML = "";
     try {
-      var viewer = window.$3Dmol.createViewer(host, { backgroundAlpha: 0 });
-      viewer.addModel(xyz, "xyz");
-      viewer.setStyle({}, { stick: { radius: 0.13 }, sphere: { scale: 0.26 } });
-      viewer.zoomTo();
-      viewer.render();
-      return viewer;
+      const view = window.$3Dmol.createViewer(host, { backgroundAlpha: 0 });
+      view.addModel(xyz, "xyz");
+      view.setStyle({}, { stick: { radius: 0.13 }, sphere: { scale: 0.26 } });
+      view.zoomTo();
+      view.render();
+      return view;
     } catch (e) {
-      host.innerHTML = '<div class="v3d-empty">Could not render 3D</div>';
+      clear(elementId, "Could not draw this geometry");
       return null;
     }
   }
 
-  MOL.viewer = { has3D: has3D, render: render };
+  MOL.viewer = { has3D, render, clear };
 })();

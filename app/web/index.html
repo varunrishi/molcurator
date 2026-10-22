@@ -3,222 +3,389 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MolCurator Workbench</title>
+<title>MolCurator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,3 27,9.5 27,22.5 16,29 5,22.5 5,9.5' fill='none' stroke='%230d9488' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%230d9488'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/styles.css">
 <script>
-
-/* Resilient library loader: try a locally vendored copy first (webapp/lib/, served by the
-   backend — works offline), then jsDelivr, then unpkg/cdnjs. Fires "molc-libs-ready" when
-   both settle so the app boots regardless of which source succeeded. */
-(function(){
-  var OCL_SRCS=[
-    "lib/openchemlib-full.js",
+/* Library loader: the copies in lib/ first (served by the backend, work offline), then CDNs.
+   Fires "molc-libs-ready" once both libraries have loaded or failed, so the app always starts. */
+(function () {
+  var OCL_SRCS = ["lib/openchemlib-full.js",
     "https://cdn.jsdelivr.net/npm/openchemlib@8.15.0/dist/openchemlib-full.js",
-    "https://unpkg.com/openchemlib@8.15.0/dist/openchemlib-full.js"
-  ];
-  var D3_SRCS=[
-    "lib/3Dmol-min.js",
+    "https://unpkg.com/openchemlib@8.15.0/dist/openchemlib-full.js"];
+  var MOL3D_SRCS = ["lib/3Dmol-min.js",
     "https://cdn.jsdelivr.net/npm/3dmol@2.1.0/build/3Dmol-min.js",
-    "https://unpkg.com/3dmol@2.1.0/build/3Dmol-min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"
-  ];
-  function tryLoad(srcs,isReady,done){
-    var i=0;
-    (function next(){
-      if(isReady()){done(true);return;}
-      if(i>=srcs.length){done(false);return;}
-      var s=document.createElement("script");s.src=srcs[i++];s.async=false;
-      s.onload=function(){isReady()?done(true):next();};
-      s.onerror=function(){next();};
+    "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"];
+  function tryLoad(srcs, isReady, done) {
+    var i = 0;
+    (function next() {
+      if (isReady()) { done(true); return; }
+      if (i >= srcs.length) { done(false); return; }
+      var s = document.createElement("script"); s.src = srcs[i++]; s.async = false;
+      s.onload = function () { isReady() ? done(true) : next(); };
+      s.onerror = next;
       document.head.appendChild(s);
     })();
   }
-  var pending=2,res={};
-  function fin(){ if(--pending===0){ window.__molcLibs=res; window.dispatchEvent(new Event("molc-libs-ready")); } }
-  tryLoad(OCL_SRCS,function(){return !!(window.OCL&&window.OCL.Molecule);},function(ok){res.ocl=ok;fin();});
-  tryLoad(D3_SRCS,function(){return !!window.$3Dmol;},function(ok){res.d3=ok;fin();});
+  var pending = 2, result = {};
+  function finished() { if (--pending === 0) { window.__molcLibs = result; window.dispatchEvent(new Event("molc-libs-ready")); } }
+  tryLoad(OCL_SRCS, function () { return !!(window.OCL && window.OCL.Molecule); }, function (ok) { result.ocl = ok; finished(); });
+  tryLoad(MOL3D_SRCS, function () { return !!window.$3Dmol; }, function (ok) { result.mol3d = ok; finished(); });
 })();
-
 </script>
 </head>
 <body>
 <div class="app">
+
+  <!-- ===================== header ===================== -->
   <header class="bar">
     <div class="brand">
       <span class="logo">Mol<b>Curator</b></span>
     </div>
     <div class="bar-spacer"></div>
-    <div class="apibar">
-      <label for="apiInput">API</label>
-      <input id="apiInput" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Backend API base URL">
-      <button class="btn sm" id="apiReconnect">Connect</button>
-    </div>
-    <span id="mode" class="modepill" title="Checking backend…"><span class="dot"></span></span>
-    <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <button class="conn" id="connPill" title="Server connection — click for settings">
+      <span class="dot"></span><span id="connText">Connecting…</span>
+    </button>
+    <button class="btn sm ghost" id="docsBtn" title="Documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+      <span class="hide-sm">Docs</span>
+    </button>
+    <a class="btn sm ghost" id="sourceBtn" target="_blank" rel="noopener" title="Source code">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+      <span class="hide-sm">Source code</span>
+    </a>
+    <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <button class="iconbtn" id="themeBtn" title="Light / dark theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>
+    </button>
   </header>
 
+  <div id="globalBanner" class="banner global" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <span id="globalBannerText"></span>
+  </div>
+
   <main>
-    <!-- ============ LEFT: seed & target ============ -->
+    <!-- ===================== left: new run ===================== -->
     <div class="col">
-      <section class="panel" style="order:2">
-        <div class="section">
-          <div class="row" style="justify-content:space-between;margin-bottom:12px">
-            <div class="eyebrow"><span class="n">03</span> Seed structure</div>
-            <div class="tabs" role="tablist" aria-label="Seed input mode">
-              <button role="tab" id="tabDraw" aria-selected="true">Draw</button>
-              <button role="tab" id="tabSmiles" aria-selected="false">SMILES</button>
-            </div>
-          </div>
-
-          <div id="paneDraw">
-            <div id="editorWrap">
-              <div id="editor"></div>
-              <div id="editorFallback">Structure sketcher could not load.<br>Switch to the SMILES tab to enter a structure.</div>
-            </div>
-            <p class="note" style="margin:8px 0 0">Draw a molecule — the SMILES and 3D view update as you edit.</p>
-          </div>
-
-          <div id="paneSmiles" hidden>
-            <div class="field">
-              <label for="smilesIn">SMILES input</label>
-              <textarea id="smilesIn" class="smiles" spellcheck="false" autocapitalize="off" autocomplete="off">c1ccc2c(c1)ccc1ccccc12</textarea>
-            </div>
-            <div class="valid" id="smilesValid"></div>
-            <div class="row wrap" style="margin-top:8px">
-              <button class="btn sm" data-ex="c1ccc2c(c1)ccc1ccccc12">Anthracene</button>
-              <button class="btn sm" data-ex="O=C1c2ccccc2C(=O)c2ccccc21">Anthraquinone</button>
-              <button class="btn sm" data-ex="c1ccc(-c2ccc(-c3ccccc3)cc2)cc1">Terphenyl</button>
-              <button class="btn sm" data-ex="CN1C=NC2=C1C(=O)N(C)C(=O)N2C">Caffeine</button>
-            </div>
-          </div>
+      <section class="panel" id="formPanel">
+        <div class="section panel-head">
+          <h2>New run</h2>
+          <span class="grow"></span>
+          <label class="inline-label" for="presetSel">Start from</label>
+          <select id="presetSel" class="select-sm" aria-label="Preset"></select>
+        </div>
+        <div class="section readiness" id="readiness">
+          <span class="chip">Checking the server…</span>
         </div>
 
+        <!-- 01 target -->
         <div class="section">
-          <div class="eyebrow" style="margin-bottom:10px">Canonical seed</div>
-          <div class="seedline">
-            <code id="seedSmiles" class="mono">—</code>
-            <button class="btn sm ghost" id="copySeed" title="Copy SMILES">Copy</button>
+          <div class="eyebrow"><span class="n">01</span> Target property</div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="mini" style="grid-column:1/-1">
+              <label for="targetSel">Property</label>
+              <select id="targetSel"></select>
+            </div>
           </div>
-        </div>
-
-        <div class="section">
-          <div class="eyebrow" style="margin-bottom:10px"><span class="n">04</span> 3D geometry <span id="geomSrc" class="chip" style="margin-left:auto">RDKit/OCL embed</span></div>
-          <div id="viewer3d"><div class="v3d-empty" id="v3dEmpty">Enter a valid structure to preview its 3D geometry.</div></div>
-          <div class="v3d-tools">
-            <button class="btn sm" id="spinBtn">Spin</button>
-            <button class="btn sm" id="dlXyz">Download .xyz</button>
-            <button class="btn sm" id="copyXyz">Copy .xyz</button>
-          </div>
-          <p class="note" style="margin:8px 0 0">A quick conformer for visualisation. The pipeline re-optimises geometry with xTB before any property is reported.</p>
-        </div>
-      </section>
-
-      <section class="panel" style="order:1">
-        <div class="section">
-          <div class="eyebrow" style="margin-bottom:6px"><span class="n">01</span> Target HOMO–LUMO gap</div>
-          <div class="range" id="rangeWidget">
+          <div class="range" id="rangeWidget" aria-hidden="true">
             <div class="track"></div><div class="fill" id="rangeFill"></div>
-            <input type="range" id="rMin" min="0" max="10" step="0.05" value="3">
-            <input type="range" id="rMax" min="0" max="10" step="0.05" value="5">
+            <input type="range" id="rMin" min="0" max="10" step="0.05" value="3" tabindex="-1">
+            <input type="range" id="rMax" min="0" max="10" step="0.05" value="3.5" tabindex="-1">
           </div>
           <div class="range-io">
-            <input id="minIn" type="number" min="0" max="10" step="0.05" value="3.00" aria-label="Minimum gap">
+            <input id="minIn" type="number" step="0.05" value="3.00" aria-label="Window minimum (eV)">
             <span class="sep">to</span>
-            <input id="maxIn" type="number" min="0" max="10" step="0.05" value="5.00" aria-label="Maximum gap">
+            <input id="maxIn" type="number" step="0.05" value="3.50" aria-label="Window maximum (eV)">
             <span class="unit">eV</span>
             <span class="grow"></span>
-            <span class="note" id="rangeNote"></span>
+            <div class="mini inline"><label for="marginIn" title="The xTB screen accepts values this far outside the window">Screen margin</label>
+              <input id="marginIn" type="number" min="0" step="0.05" value="0.2"></div>
+          </div>
+          <p class="note" id="levelNote"></p>
+        </div>
+
+        <!-- 02 seed -->
+        <div class="section">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <div class="eyebrow"><span class="n">02</span> Seed molecule</div>
+            <div class="tabs" role="tablist" aria-label="Seed input">
+              <button role="tab" id="tabSmiles" aria-selected="true">SMILES</button>
+              <button role="tab" id="tabDraw" aria-selected="false">Draw</button>
+            </div>
+          </div>
+          <div id="paneSmiles">
+            <textarea id="smilesIn" class="smiles" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Seed SMILES"></textarea>
+            <div class="row wrap" style="margin-top:8px">
+              <span class="note">Examples:</span>
+              <button class="btn sm" data-ex="c1ccc(-c2cccs2)s1">Bithiophene</button>
+              <button class="btn sm" data-ex="c1ccc2cc3ccccc3cc2c1">Anthracene</button>
+              <button class="btn sm" data-ex="O=C1C=CC(=O)C=C1">Benzoquinone</button>
+            </div>
+          </div>
+          <div id="paneDraw" hidden>
+            <div id="editorWrap"><div id="editor"></div>
+              <div id="editorFallback">The structure editor could not load. Use the SMILES tab.</div></div>
+          </div>
+          <div class="seedcheck" id="seedCheck"></div>
+          <div class="seed-preview">
+            <div class="depict-sm" id="seedDepict"></div>
+            <div id="viewer3d"><div class="v3d-empty">3D preview appears here</div></div>
+          </div>
+          <p class="note">Preview only: one quick RDKit conformer. The run prepares its own geometry (30 conformers, MMFF94) before xTB.</p>
+        </div>
+
+        <!-- 03 search -->
+        <div class="section">
+          <div class="eyebrow"><span class="n">03</span> Search</div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="mini"><label for="nCand">Candidates per round</label><input id="nCand" type="number" min="1" max="1000" value="100"></div>
+            <div class="mini"><label for="mStrength">Mutation strength</label><input id="mStrength" type="number" min="1" max="3" value="2"></div>
+            <div class="mini"><label for="nXtb">xTB runs per round</label><input id="nXtb" type="number" min="1" value="200"></div>
+            <div class="mini"><label for="minEx" title="The ML model trains once this many molecules have xTB values">ML trains after (xTB values)</label><input id="minEx" type="number" min="1" value="150"></div>
+            <div class="mini"><label for="rngSeed">Random seed</label><input id="rngSeed" type="number" min="0" value="0"></div>
+            <div class="mini"><label>Generator</label><input value="STONED SELFIES" disabled></div>
           </div>
         </div>
+
+        <!-- 04 QM -->
         <div class="section">
-          <div class="eyebrow" style="margin-bottom:10px"><span class="n">02</span> Run settings</div>
-          <div class="grid2">
-            <div class="mini"><label for="nCand">Candidates / round</label><input id="nCand" type="number" min="4" max="500" step="4" value="48"></div>
-            <div class="mini"><label for="nRounds">Rounds</label><input id="nRounds" type="number" min="1" max="8" value="3"></div>
-            <div class="mini"><label for="mStrength">Mutation strength</label><input id="mStrength" type="number" min="1" max="5" value="2"></div>
-            <div class="mini"><label for="genSel">Generator</label>
-              <select id="genSel"><option value="gb_ga">GB-GA (Jensen)</option><option value="demo">Graph-edit (demo)</option></select>
-            </div>
-            <div class="mini" style="grid-column:1/-1"><label for="predSel">Prediction model</label>
-              <select id="predSel" disabled>
-                <option value="auto">Auto (best available)</option>
-                <option value="delfta">DelFTa — ML, ≈ ωB97X-D/def2-SVP</option>
-                <option value="tblite">GFN2-xTB (tblite) — semi-empirical QM</option>
-              </select>
+          <div class="row" style="justify-content:space-between">
+            <div class="eyebrow"><span class="n">04</span> QM validation</div>
+            <label class="switch"><input type="checkbox" id="qmOn"><span></span><span class="switch-label">Validate hits with QM</span></label>
+          </div>
+          <div class="grid3" id="qmFields" style="margin-top:10px">
+            <div class="mini"><label for="qmBackend">Backend</label><select id="qmBackend"></select></div>
+            <div class="mini"><label for="qmFunctional">Functional</label><input id="qmFunctional" value="B3LYP"></div>
+            <div class="mini"><label for="qmBasis">Basis set</label><input id="qmBasis" value="def2-SVP"></div>
+          </div>
+          <p class="note" id="qmNote"></p>
+        </div>
+
+        <!-- 05 budget -->
+        <div class="section">
+          <div class="eyebrow"><span class="n">05</span> Budget and decisions</div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="mini"><label for="maxRounds">Max rounds</label><input id="maxRounds" type="number" min="1" value="5"></div>
+            <div class="mini"><label for="targetSize">Stop at dataset size</label><input id="targetSize" type="number" min="1" value="10"></div>
+            <div class="mini"><label for="maxQm">Max QM calls</label><input id="maxQm" type="number" min="0" value="20"></div>
+            <div class="mini"><label for="maxMinutes">Max time (minutes)</label><input id="maxMinutes" type="number" min="1" value="60"></div>
+          </div>
+          <div class="mini" style="margin-top:10px"><label>Decisions</label>
+            <div class="segmented" role="radiogroup" aria-label="Decisions">
+              <button role="radio" data-decisions="rules" aria-checked="true">Rules</button>
+              <button role="radio" data-decisions="llm" aria-checked="false">LLM (Claude Haiku 4.5)</button>
             </div>
           </div>
-          <button class="btn primary" id="runBtn" style="width:100%;margin-top:12px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
-            <span id="runLabel">Generate &amp; screen</span>
-          </button>
-          <div class="progress" id="progWrap" hidden><i id="progBar"></i></div>
-          <div class="runlog" id="runLog" hidden></div>
+        </div>
+
+        <!-- start -->
+        <div class="section">
+          <div id="checks" class="checks"></div>
+          <div class="row" style="margin-top:10px">
+            <input id="runName" class="text-sm grow" placeholder="Run name (optional)" spellcheck="false" aria-label="Run name">
+            <button class="btn primary" id="startBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
+              Start run
+            </button>
+          </div>
         </div>
       </section>
     </div>
 
-    <!-- ============ RIGHT: explorer ============ -->
+    <!-- ===================== right: runs ===================== -->
     <div class="col">
-      <section class="panel" style="flex:1;display:flex;flex-direction:column">
-        <div class="section">
-          <div class="explorer-head">
-            <h2>Candidate explorer</h2>
-            <span class="count" id="exCount">no candidates yet</span>
-            <span class="grow"></span>
-            <div class="filters" role="tablist" aria-label="Filter">
-              <button role="tab" data-filter="all" aria-selected="true">All</button>
-              <button role="tab" data-filter="hits" aria-selected="false">In target</button>
-              <button role="tab" data-filter="fail" aria-selected="false">Failed</button>
+      <section class="panel" id="runPanel">
+        <div class="section panel-head">
+          <h2>Runs</h2>
+          <select id="runSel" class="select-sm grow" aria-label="Choose a run"></select>
+          <button class="iconbtn sm" id="refreshRuns" title="Refresh the list" aria-label="Refresh">↻</button>
+        </div>
+
+        <div id="runEmpty" class="section"><div class="empty">No run selected. Set up a run on the left and press <b>Start run</b>, or pick an earlier run above.</div></div>
+
+        <div id="runView" hidden>
+          <div class="section">
+            <div class="runhead">
+              <code id="runId" class="mono"></code>
+              <span id="runStatus" class="chip"></span>
+              <span class="grow"></span>
+              <button class="btn sm" id="stopBtn" hidden>Stop</button>
+              <button class="btn sm" id="resumeBtn" hidden>Resume</button>
+              <div class="menu">
+                <button class="btn sm" id="dlBtn" aria-haspopup="true">Download ▾</button>
+                <div class="menu-list" id="dlMenu" hidden>
+                  <button data-dl="archive">Whole run (.zip)</button>
+                  <button data-dl="dataset.csv">Curated dataset (CSV)</button>
+                  <button data-dl="dataset_ml_only.csv">ML-only rows (CSV)</button>
+                  <button data-dl="summary.md">Summary (Markdown)</button>
+                  <button data-dl="trace.jsonl">Trace (JSONL)</button>
+                  <button data-dl="config.yaml">Config (YAML)</button>
+                </div>
+              </div>
             </div>
-            <select id="sortSel" class="mini" style="width:auto;padding:6px 8px">
-              <option value="dist">Sort: closest to window</option>
-              <option value="asc">Gap ↑</option>
-              <option value="desc">Gap ↓</option>
-              <option value="round">Round</option>
-            </select>
+            <div class="runmeta" id="runMeta"></div>
+            <div id="runBanner" class="banner" hidden></div>
           </div>
-          <div id="banner" class="banner" style="margin-top:12px" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-            <span id="bannerText"></span>
+
+          <div class="section">
+            <div class="eyebrow" style="margin-bottom:8px">Progress <span id="roundLabel" class="chip" style="margin-left:auto"></span></div>
+            <div class="steps" id="steps"></div>
+            <div class="meters" id="meters"></div>
           </div>
-        </div>
 
-        <div class="section">
-          <div class="eyebrow" style="margin-bottom:8px">Gap distribution <span class="note" style="text-transform:none;letter-spacing:0;margin-left:auto">amber band = target window · teal line = seed</span></div>
-          <div class="dist" id="dist"><div class="axis"><span>0</span><span>eV</span><span>10</span></div></div>
-        </div>
+          <div class="section tabs-section">
+            <div class="tabs wide" role="tablist" aria-label="Run details">
+              <button role="tab" data-tab="molecules" aria-selected="true">Molecules</button>
+              <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
+              <button role="tab" data-tab="rounds" aria-selected="false">Rounds</button>
+              <button role="tab" data-tab="summary" aria-selected="false">Summary</button>
+              <button role="tab" data-tab="evaluation" aria-selected="false">Evaluation</button>
+              <button role="tab" data-tab="log" aria-selected="false">Log</button>
+            </div>
+          </div>
 
-        <div class="section" style="flex:1">
-          <div id="cardsWrap">
-            <div class="empty" id="emptyState">Set a seed and a target window, then <b>Generate &amp; screen</b> to populate the explorer.</div>
-            <div class="cards" id="cards" hidden></div>
+          <div class="section tabpane" data-pane="molecules">
+            <div class="explorer-head">
+              <span class="count" id="molCount"></span>
+              <span class="grow"></span>
+              <div class="filters" role="tablist" aria-label="Filter molecules">
+                <button data-filter="all" aria-selected="true">All</button>
+                <button data-filter="curated" aria-selected="false">Curated</button>
+                <button data-filter="qm" aria-selected="false">QM-validated</button>
+                <button data-filter="failed" aria-selected="false">Failed</button>
+              </div>
+              <select id="sortSel" class="select-sm" aria-label="Sort">
+                <option value="dist">Closest to window</option>
+                <option value="asc">Value ↑</option>
+                <option value="desc">Value ↓</option>
+                <option value="id">Round / id</option>
+              </select>
+            </div>
+            <div class="dist" id="dist"></div>
+            <div class="legend">
+              <span><i class="lv qm"></i>QM</span><span><i class="lv xtb"></i>xTB</span><span><i class="lv ml"></i>ML estimate</span>
+              <span><i class="win"></i>target window</span>
+            </div>
+            <div class="cards" id="cards"></div>
+          </div>
+          <div class="section tabpane" data-pane="activity" hidden><ol class="activity" id="activity"></ol></div>
+          <div class="section tabpane" data-pane="rounds" hidden><div class="tablewrap"><table class="datatable" id="roundsTable"></table></div></div>
+          <div class="section tabpane" data-pane="summary" hidden><pre class="summary" id="summaryText"></pre></div>
+          <div class="section tabpane" data-pane="evaluation" hidden>
+            <p class="note">The trajectory evaluator checks the trace: step order, budgets, failure handling. A pass means the agent behaved correctly, not that target molecules were found.</p>
+            <button class="btn sm" id="evalBtn">Run evaluator</button>
+            <div id="evalOut"></div>
+          </div>
+          <div class="section tabpane" data-pane="log" hidden>
+            <div class="row"><span class="note">Output of the agent process (runs started from this app).</span><span class="grow"></span><button class="btn sm" id="logBtn">Refresh</button></div>
+            <pre class="summary" id="logText"></pre>
           </div>
         </div>
       </section>
     </div>
   </main>
+
 </div>
 
-<!-- detail overlay -->
+<!-- ===================== molecule detail ===================== -->
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <div class="sheet">
     <div class="sheet-head">
-      <h3 id="dTitle">Candidate</h3>
-      <span id="dBadge" class="chip">—</span>
+      <h3 id="dTitle">Molecule</h3>
+      <span id="dBadge" class="chip"></span>
       <button class="iconbtn" id="closeSheet" aria-label="Close">✕</button>
     </div>
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- ===================== settings ===================== -->
+<dialog id="settingsDialog" class="dialog" aria-labelledby="settingsTitle">
+  <form method="dialog" id="settingsForm">
+    <div class="dialog-head"><h3 id="settingsTitle">Settings</h3><button class="iconbtn" value="cancel" aria-label="Close">✕</button></div>
+    <div class="dialog-body">
+      <p class="note" id="settingsNote"></p>
+      <div class="field"><label for="setApi">Server address</label>
+        <input id="setApi" class="text" spellcheck="false" autocapitalize="off" placeholder="(this page's server)">
+        <span class="note">Leave empty when this page is served by the MolCurator server. Otherwise e.g. <code>https://your-name.ngrok-free.app</code>.</span></div>
+      <div class="field"><label for="setToken">API token</label>
+        <div class="row"><input id="setToken" class="text grow" type="password" spellcheck="false" autocomplete="off" placeholder="printed by the server at startup">
+          <button type="button" class="btn sm" id="showToken">Show</button></div></div>
+      <div style="display: none;" class="field"><label for="setRepo">Source code link</label>
+        <input id="setRepo" class="text" spellcheck="false" placeholder="(the server's default)"></div>
+      <div class="field"><label for="setPoll">Refresh a running run every (seconds)</label>
+        <input id="setPoll" class="text" type="number" min="2" max="120"></div>
+      <div id="settingsResult" class="checks"></div>
+    </div>
+    <div class="dialog-foot">
+      <button type="button" class="btn" id="testConn">Test connection</button>
+      <span class="grow"></span>
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" value="save" id="saveSettings">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===================== documentation ===================== -->
+<dialog id="docsDialog" class="dialog wide" aria-labelledby="docsTitle">
+  <form method="dialog">
+    <div class="dialog-head"><h3 id="docsTitle">Documentation</h3><button class="iconbtn" value="close" aria-label="Close">✕</button></div>
+    <div class="dialog-body doc">
+      <!-- <h4>What a run does</h4>
+      <p>MolCurator searches for molecules whose property lies in a target window, starting from your seed. Each round it:</p>
+      <ol>
+        <li><b>Plans</b> the round (rules or an LLM) and <b>generates</b> new molecules from the best ones so far (STONED SELFIES).</li>
+        <li>Runs <b>xTB</b> on a random sample of them (30 MMFF94 conformers, then one GFN2-xTB calculation each).</li>
+        <li><b>Trains an ML model</b> once enough xTB values exist, and estimates the rest with it.</li>
+        <li><b>Screens</b> candidates against the window plus the margin.</li>
+        <li>With QM on, sends the closest candidates to <b>QM</b> (ORCA DFT) within the QM budget.</li>
+        <li><b>Curates</b> molecules whose best estimate is inside the window, then decides whether to continue.</li>
+      </ol>
+      <p>A run stops at the dataset size, or when rounds, QM calls or time run out. Stopped runs can be resumed.</p>
+      <h4>How far to trust a value</h4>
+      <ul class="levels">
+        <li><span class="lvbadge qm">QM</span> DFT single point (e.g. B3LYP/def2-SVP). The level the target window is meant for.</li>
+        <li><span class="lvbadge xtb">xTB</span> GFN2-xTB, semi-empirical. Fast but offset from DFT: in the repo's local analysis, B3LYP gaps were on average 2.55 eV higher than xTB gaps (60 molecules).</li>
+        <li><span class="lvbadge ml">ML</span> Model trained on xTB values. The README reports a test error of about 0.5 eV: a candidate to check, not a result.</li>
+      </ul> -->
+      
+      <div class="doclinks" style="display:none;">
+        <a class="btn sm" id="docApi" target="_blank" rel="noopener">Interactive API reference</a>
+        <a class="btn sm" id="docGuide" target="_blank" rel="noopener">API guide (docs/api)</a>
+        <a class="btn sm" id="docReadme" target="_blank" rel="noopener">Project README</a>
+        <a class="btn sm" id="docTrace" target="_blank" rel="noopener">Trace format</a>
+      </div>
+      <div class="section">
+        <div class="eyebrow">Contributors</div>
+        <div id="contributors" class="contributors"></div>
+      </div>
+      <div class="section foot-links">
+        <span>MolCurator · Apache-2.0</span>
+        <span class="grow"></span>
+        <button class="linkbtn" id="footDocs">Documentation</button>
+        <a class="linkbtn" id="footSource" target="_blank" rel="noopener">Source code</a>
+        <a class="linkbtn" id="footApi" target="_blank" rel="noopener">API reference</a>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script src="js/config.js"></script>
+<script src="js/contributors.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/api.js"></script>
 <script src="js/chem.js"></script>
 <script src="js/viewer.js"></script>
+<script src="js/form.js"></script>
+<script src="js/monitor.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
