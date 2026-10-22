@@ -12,14 +12,13 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, ValidationError
 from starlette.background import BackgroundTask
 
-from molcurator.config import RunConfig
+from molcurator.config import RunConfig, load_config
 
 from . import __version__, capabilities, chem, run_files
 from .run_manager import RunConflict, RunManager
@@ -116,9 +115,9 @@ def presets(request: Request) -> list[dict]:
     out = []
     for path in sorted((settings_of(request).repo / "configs").glob("*.yaml")):
         text = path.read_text()
-        try:
-            config = RunConfig.model_validate(yaml.safe_load(text)).model_dump(mode="json")
-        except ValidationError:
+        try:  # load_config, as the CLI does: it also reads `seeds_file:` (a seeds CSV next to the YAML)
+            config = load_config(path).model_dump(mode="json")
+        except (ValueError, OSError):  # an invalid config (ValidationError is a ValueError) or a missing seeds file
             continue
         notes = []
         if "PLACEHOLDER" in text:

@@ -1,4 +1,5 @@
 """Run configuration: one YAML file per use case, validated once at startup (Phase 2, R1.2)."""
+import csv
 from pathlib import Path
 from typing import Literal
 
@@ -172,10 +173,25 @@ class RunConfig(StrictModel):
         return self
 
 
+def read_seeds_file(path: Path) -> list[str]:
+    """The `smiles` column of a seed CSV (data/seeds/README.md), in file order; blank cells are skipped."""
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        if "smiles" not in (reader.fieldnames or []):
+            raise ValueError(f"seeds file {path} has no 'smiles' column")
+        return [row["smiles"].strip() for row in reader if (row["smiles"] or "").strip()]
+
+
 def load_config(path: str | Path) -> RunConfig:
-    """Read and validate a run config YAML file; errors name the file and the bad fields."""
+    """Read and validate a run config YAML file; errors name the file and the bad fields.
+    `seeds_file:` (a CSV path, relative to the YAML file) may replace `seeds:`; it is read here, so the
+    RunConfig, and the config.yaml a run saves, hold the seed SMILES themselves."""
     path = Path(path)
     data = yaml.safe_load(path.read_text()) or {}  # safe_load builds plain data only; {} for an empty file
+    if "seeds_file" in data:
+        if "seeds" in data:
+            raise ValueError(f"invalid run config {path}: give seeds or seeds_file, not both")
+        data["seeds"] = read_seeds_file(path.parent / data.pop("seeds_file"))
     try:
         return RunConfig.model_validate(data)
     except ValidationError as e:

@@ -5,8 +5,7 @@ target:  # DFT-like: small conjugated molecules sit at ~4-7 eV at B3LYP (3.0-3.5
   name: homo_lumo_gap
   min: 4.0
   max: 4.5
-seeds:
-  - "c1ccc(-c2cccs2)s1"  # PLACEHOLDER: 2,2'-bithiophene; replace with the real seed molecule
+seeds_file: ../data/seeds/homo_lumo.csv  # the 10 QM9 seeds (smiles column), relative to this file
 screening:
   margin: 0.5  # screen accepts 3.5-5.0 eV of corrected xTB: about the correction's typical error (0.46 eV)
 predict:
