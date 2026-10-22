@@ -65,6 +65,7 @@
     system: () => request("/api/system"),
     presets: () => request("/api/presets"),
     validate: (cfg) => request("/api/config/validate", { method: "POST", body: { config: cfg } }),
+    assistantPlan: (prompt, current) => request("/api/assistant/plan", { method: "POST", body: { prompt: prompt, current: current || null }, timeout: 60000 }),
     inspect: (smiles) => request("/api/chem/inspect", { method: "POST", body: { smiles: smiles, xyz: true }, timeout: 60000 }),
     runs: () => request("/api/runs"),
     start: (cfg, runId) => request("/api/runs", { method: "POST", body: { config: cfg, run_id: runId || null } }),

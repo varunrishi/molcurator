@@ -10,23 +10,32 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/styles.css">
 <script>
-/* Library loader: the copies in lib/ first (served by the backend, work offline), then CDNs.
-   Fires "molc-libs-ready" once both libraries have loaded or failed, so the app always starts. */
+/* Library loader: CDNs first, then the copies in lib/ (served by our server; used offline or
+   when the CDNs are blocked). The CDN files are the same npm releases as lib/ (OpenChemLib
+   8.15.0, 3Dmol.js 2.1.0). A source that has not loaded after 8 s is skipped. Fires
+   "molc-libs-ready" once both libraries have loaded or failed, so the app always starts.
+   css/styles.css is the app's own stylesheet and always comes from the server. */
 (function () {
-  var OCL_SRCS = ["lib/openchemlib-full.js",
-    "https://cdn.jsdelivr.net/npm/openchemlib@8.15.0/dist/openchemlib-full.js",
-    "https://unpkg.com/openchemlib@8.15.0/dist/openchemlib-full.js"];
-  var MOL3D_SRCS = ["lib/3Dmol-min.js",
-    "https://cdn.jsdelivr.net/npm/3dmol@2.1.0/build/3Dmol-min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"];
+  var OCL_SRCS = ["https://cdn.jsdelivr.net/npm/openchemlib@8.15.0/dist/openchemlib-full.js",
+    "https://unpkg.com/openchemlib@8.15.0/dist/openchemlib-full.js",
+    "lib/openchemlib-full.js"];
+  var MOL3D_SRCS = ["https://cdn.jsdelivr.net/npm/3dmol@2.1.0/build/3Dmol-min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js",
+    "lib/3Dmol-min.js"];
+  var TIMEOUT_MS = 8000;
   function tryLoad(srcs, isReady, done) {
-    var i = 0;
+    var i = 0, finished = false;
+    function finish(ok) { if (!finished) { finished = true; done(ok); } }
     (function next() {
-      if (isReady()) { done(true); return; }
-      if (i >= srcs.length) { done(false); return; }
-      var s = document.createElement("script"); s.src = srcs[i++]; s.async = false;
-      s.onload = function () { isReady() ? done(true) : next(); };
-      s.onerror = next;
+      if (finished) return;
+      if (isReady()) { finish(true); return; }
+      if (i >= srcs.length) { finish(false); return; }
+      var s = document.createElement("script"), moved = false;
+      function advance() { if (!moved) { moved = true; clearTimeout(timer); next(); } }
+      var timer = setTimeout(advance, TIMEOUT_MS);
+      s.src = srcs[i++];
+      s.onload = function () { isReady() ? (clearTimeout(timer), finish(true)) : advance(); };
+      s.onerror = advance;
       document.head.appendChild(s);
     })();
   }
@@ -70,7 +79,32 @@
     <span id="globalBannerText"></span>
   </div>
 
-  <main>
+  <!-- ===================== agent view: set up a run from a prompt (js/assistant.js) ===================== -->
+  <section id="agentView" class="agent" hidden>
+    <div class="agent-inner">
+      <div class="agent-thread" id="agentThread" aria-live="polite">
+        <div class="agent-welcome" id="agentWelcome">
+          <h2>What should MolCurator look for?</h2>
+          <p class="note">Describe the target window and a seed molecule. <span id="agentModel">Claude</span> turns it into a
+            run proposal; you check it, then start it. Every value it shows comes from the server.</p>
+          <div class="examples" id="agentExamples">
+            <button type="button" class="example">Find molecules similar to 2,2'-bithiophene with a HOMO–LUMO gap between 4.0 and 4.5 eV</button>
+            <button type="button" class="example">Start from anthracene, gap 3.5 to 4.0 eV, 3 rounds of 50 candidates, stop at 20 molecules</button>
+            <button type="button" class="example">TADF emitters from N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1, S1–T1 gap below 0.2 eV, without QM</button>
+          </div>
+        </div>
+      </div>
+      <form class="composer" id="agentForm">
+        <textarea id="agentInput" rows="2" placeholder="Describe the run, e.g. 'Seed: benzoquinone. HOMO–LUMO gap 4.0–4.5 eV, 4 rounds.'" aria-label="Describe the run"></textarea>
+        <button class="btn primary" id="agentSend" type="submit" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </form>
+      <p class="note composer-note">Enter to send · Shift+Enter for a new line · nothing starts until you press <b>Start run</b></p>
+    </div>
+  </section>
+
+  <main id="dashboardView">
     <!-- ===================== left: new run ===================== -->
     <div class="col">
       <section class="panel" id="formPanel">
@@ -99,12 +133,12 @@
             <input type="range" id="rMax" min="0" max="10" step="0.05" value="3.5" tabindex="-1">
           </div>
           <div class="range-io">
-            <input id="minIn" type="number" step="0.05" value="3.00" aria-label="Window minimum (eV)">
+            <input id="minIn" type="number" step="0.05" value="4.00" aria-label="Window minimum">
             <span class="sep">to</span>
-            <input id="maxIn" type="number" step="0.05" value="3.50" aria-label="Window maximum (eV)">
-            <span class="unit">eV</span>
+            <input id="maxIn" type="number" step="0.05" value="4.50" aria-label="Window maximum">
+            <span class="unit" id="unitLabel">eV</span>
             <span class="grow"></span>
-            <div class="mini inline"><label for="marginIn" title="The xTB screen accepts values this far outside the window">Screen margin</label>
+            <div class="mini inline"><label for="marginIn" title="The PREDICT screen accepts values this far outside the window">Screen margin</label>
               <input id="marginIn" type="number" min="0" step="0.05" value="0.2"></div>
           </div>
           <p class="note" id="levelNote"></p>
@@ -137,7 +171,7 @@
             <div class="depict-sm" id="seedDepict"></div>
             <div id="viewer3d"><div class="v3d-empty">3D preview appears here</div></div>
           </div>
-          <p class="note">Preview only: one quick RDKit conformer. The run prepares its own geometry (30 conformers, MMFF94) before xTB.</p>
+          <p class="note">Preview only: one quick RDKit conformer. The run prepares its own geometry (MMFF94 conformers) before PREDICT.</p>
         </div>
 
         <!-- 03 search -->
@@ -146,10 +180,12 @@
           <div class="grid2" style="margin-top:10px">
             <div class="mini"><label for="nCand">Candidates per round</label><input id="nCand" type="number" min="1" max="1000" value="100"></div>
             <div class="mini"><label for="mStrength">Mutation strength</label><input id="mStrength" type="number" min="1" max="3" value="2"></div>
-            <div class="mini"><label for="nXtb">xTB runs per round</label><input id="nXtb" type="number" min="1" value="200"></div>
-            <div class="mini"><label for="minEx" title="The ML model trains once this many molecules have xTB values">ML trains after (xTB values)</label><input id="minEx" type="number" min="1" value="150"></div>
+            <div class="mini"><label for="nXtb" title="PREDICT runs on a random sample of this many new candidates per round">PREDICT runs per round</label><input id="nXtb" type="number" min="1" value="200"></div>
+            <div class="mini"><label for="minEx" title="The ML model trains once this many molecules have PREDICT values">ML trains after (PREDICT values)</label><input id="minEx" type="number" min="1" value="150"></div>
             <div class="mini"><label for="rngSeed">Random seed</label><input id="rngSeed" type="number" min="0" value="0"></div>
             <div class="mini"><label>Generator</label><input value="STONED SELFIES" disabled></div>
+            <div class="mini" style="grid-column:1/-1"><label for="predictMethod" title="Empty: GFN2-xTB where xTB can give the target, else B97-3c through ORCA">PREDICT method</label>
+              <input id="predictMethod" spellcheck="false" autocapitalize="off" placeholder="default"></div>
           </div>
         </div>
 
@@ -157,7 +193,7 @@
         <div class="section">
           <div class="row" style="justify-content:space-between">
             <div class="eyebrow"><span class="n">04</span> QM validation</div>
-            <label class="switch"><input type="checkbox" id="qmOn"><span></span><span class="switch-label">Validate hits with QM</span></label>
+            <label class="switch"><input type="checkbox" id="qmOn" checked><span></span><span class="switch-label">Validate hits with QM</span></label>
           </div>
           <div class="grid3" id="qmFields" style="margin-top:10px">
             <div class="mini"><label for="qmBackend">Backend</label><select id="qmBackend"></select></div>
@@ -269,7 +305,7 @@
             </div>
             <div class="dist" id="dist"></div>
             <div class="legend">
-              <span><i class="lv qm"></i>QM</span><span><i class="lv xtb"></i>xTB</span><span><i class="lv ml"></i>ML estimate</span>
+              <span><i class="lv qm"></i>QM</span><span><i class="lv xtb"></i><span id="legendPredict">PREDICT</span></span><span><i class="lv ml"></i>ML estimate</span>
               <span><i class="win"></i>target window</span>
             </div>
             <div class="cards" id="cards"></div>
@@ -291,6 +327,13 @@
     </div>
   </main>
 
+  <!-- switches between the agent view and the dashboard; shown only when the server has Claude -->
+  <button class="fab" id="viewFab" hidden aria-label="Switch view">
+    <svg class="icon-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+    <svg class="icon-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span id="viewFabLabel">Dashboard</span>
+  </button>
+
 </div>
 
 <!-- ===================== molecule detail ===================== -->
@@ -306,6 +349,28 @@
 </div>
 
 <!-- ===================== settings ===================== -->
+<!-- ===================== connect (opens when the app loads) ===================== -->
+<dialog id="connectDialog" class="dialog" aria-labelledby="connectTitle">
+  <form id="connectForm">
+    <div class="dialog-head"><h3 id="connectTitle">Connect to a MolCurator server</h3></div>
+    <div class="dialog-body">
+      <p class="note" id="connectNote" style="margin:0 0 14px">Enter the server's address and the API token it printed at startup.</p>
+      <div class="field"><label for="conApi">Server address</label>
+        <input id="conApi" class="text" spellcheck="false" autocapitalize="off" inputmode="url">
+        <span class="note">Leave empty when this page is served by the MolCurator server. Otherwise e.g. <code>https://your-name.ngrok-free.app</code>.</span></div>
+      <div class="field"><label for="conToken">API token</label>
+        <div class="row"><input id="conToken" class="text grow" type="password" spellcheck="false" autocomplete="off" placeholder="printed by the server at startup">
+          <button type="button" class="btn sm" id="conShowToken">Show</button></div></div>
+      <div id="connectResult" class="checks"></div>
+    </div>
+    <div class="dialog-foot">
+      <button type="button" class="btn" id="connectLater">Not now</button>
+      <span class="grow"></span>
+      <button type="submit" class="btn primary" id="connectGo">Connect</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="settingsDialog" class="dialog" aria-labelledby="settingsTitle">
   <form method="dialog" id="settingsForm">
     <div class="dialog-head"><h3 id="settingsTitle">Settings</h3><button class="iconbtn" value="cancel" aria-label="Close">✕</button></div>
@@ -349,6 +414,7 @@
 <script src="js/viewer.js"></script>
 <script src="js/form.js"></script>
 <script src="js/monitor.js"></script>
+<script src="js/assistant.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

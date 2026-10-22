@@ -12,6 +12,7 @@ MolCurator is an AI agent that creates and curates a benchmark set of molecules,
 - [Tools](#tools)
 - [Installation](#installation)
 - [Running the agent](#running-the-agent)
+- [Web app and API server](#web-app-and-api-server)
 - [Project structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
@@ -289,6 +290,22 @@ minute) and its results: round stats, `dataset.csv`, the summary and the curated
 ring systems held out for the test also reach ML PREDICT. It is off by default; on real data it lowered the
 next round's ML error by about 3% (0.68 → 0.66 eV), and the reported test MAE becomes a cautious estimate.
 
+## Web app and API server
+
+A web app (`app/web/`) and an HTTP API (`app/server/`) start runs, follow them live and show
+their molecules, without changing the agent: each run is the same `molcurator run` command.
+
+```bash
+scripts/run.sh               # http://127.0.0.1:8000; prints the API token
+```
+
+The app asks for the server address and token when it opens, then shows the **agent view**:
+describe a run in plain language and Claude proposes the config (needs `ANTHROPIC_API_KEY` on the
+server); nothing starts until you press Start. The **dashboard** has the full form and the run
+monitor. The app also runs from GitHub Pages ([docs/deploy-github-pages.md](docs/deploy-github-pages.md)),
+and `notebooks/deploy_kaggle.ipynb` runs the server on Kaggle behind ngrok. API reference:
+[docs/api/](docs/api/README.md).
+
 ## Property tools and batch runs
 
 The chemistry behind PREDICT and VALIDATE is two tool-call functions that take a geometry, a
@@ -335,13 +352,16 @@ src/molcurator/
 ├── batch/       `molcurator-properties` command: PREDICT/VALIDATE over a file, reports, SLURM
 ├── schemas.py   shared data models (Candidate, PropertyValue, CuratedEntry)
 └── cli.py       `molcurator` command
+app/server/      HTTP API around the agent (FastAPI; started by scripts/run.sh)
+app/web/         web app: agent view and dashboard (plain HTML/JS, also on GitHub Pages)
 configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml), example chemistry/SLURM settings
 data/seeds/      seed molecules
 data/properties/ shared xTB/ORCA property dataset (PROPERTY_DATA.md)
 data/runs/       per-run outputs (gitignored)
+docs/api/        API reference and deployment (local, tunnel, Kaggle)
 docs/chemistry/  guides from the earlier xtb-binary implementation (superseded; see Property tools above)
 research/        study results, e.g. the local xTB validation report
-tests/           tool tests, plus tests/agent/ for the agent
+tests/           tool tests, plus tests/agent/ for the agent and tests/server/ for the API
 notebooks/       exploration and demo plots
 scripts/         helper scripts
 demo/            presentation and video assets

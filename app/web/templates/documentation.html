@@ -11,8 +11,11 @@
 <p>MolCurator searches for molecules whose property lies in a target window, starting from your seed. Each round it:</p>
 <ol>
   <li><b>Plans</b> the round (rules or an LLM) and <b>generates</b> new molecules from the best ones so far (STONED SELFIES).</li>
-  <li>Runs <b>xTB</b> on a random sample of them (30 MMFF94 conformers, then one GFN2-xTB calculation each).</li>
-  <li><b>Trains an ML model</b> once enough xTB values exist, and estimates the rest with it.</li>
+  <li><b>Predicts</b> the property for a random sample of them: MMFF94 conformers (30 by default), then one
+    calculation on the lowest. GFN2-xTB (tblite, seconds) where xTB can give the property; otherwise B97-3c
+    through ORCA (e.g. TD-DFT for the S1–T1 gap, minutes). For the HOMO–LUMO gap preset, xTB gaps are
+    corrected to DFT-like values with a linear fit.</li>
+  <li><b>Trains an ML model</b> once enough PREDICT values exist, and estimates the rest with it.</li>
   <li><b>Screens</b> candidates against the window plus the margin.</li>
   <li>With QM on, sends the closest candidates to <b>QM</b> (ORCA DFT) within the QM budget.</li>
   <li><b>Curates</b> molecules whose best estimate is inside the window, then decides whether to continue.</li>
@@ -21,9 +24,13 @@
 
 <h4>How far to trust a value</h4>
 <ul class="levels">
-  <li><span class="lvbadge qm">QM</span> DFT single point (e.g. B3LYP/def2-SVP). The level the target window is meant for.</li>
-  <li><span class="lvbadge xtb">xTB</span> GFN2-xTB, semi-empirical. Fast but offset from DFT: in the repo's local analysis, B3LYP gaps were on average 2.55 eV higher than xTB gaps (60 molecules).</li>
-  <li><span class="lvbadge ml">ML</span> Model trained on xTB values. The README reports a test error of about 0.5 eV: a candidate to check, not a result.</li>
+  <li><span class="lvbadge qm">QM</span> DFT calculation (e.g. B3LYP/def2-SVP) with ORCA. The level the target window is meant for.</li>
+  <li><span class="lvbadge xtb">xTB→DFT</span> GFN2-xTB gap corrected to a DFT-like value (configs/homo_lumo.yaml:
+    fitted on 60 xTB/B3LYP/def2-SVP pairs, typical error 0.455 eV). The molecule's details also show the raw xTB value,
+    and say when it lies outside the fitted range.</li>
+  <li><span class="lvbadge xtb">xTB</span> raw GFN2-xTB value, semi-empirical. Fast; for gaps, well below DFT values unless corrected.</li>
+  <li><span class="lvbadge xtb">B97-3c</span> PREDICT by DFT/TD-DFT through ORCA, for properties xTB cannot give.</li>
+  <li><span class="lvbadge ml">ML</span> Model trained on PREDICT values. The README reports a test error of about 0.5 eV (HOMO–LUMO gap): a candidate to check, not a result.</li>
 </ul>
 
 <h4>Reference</h4>

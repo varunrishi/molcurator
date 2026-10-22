@@ -6,9 +6,10 @@ Start it with scripts/run.sh, or from the repository root:
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, routes
+from . import __version__, assistant, routes
 from .run_manager import RunManager
 from .settings import Settings, load_settings
 
@@ -20,8 +21,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                   docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/openapi.json")
     app.state.settings = settings
     app.state.runs = RunManager(settings)
+    app.state.assistant_client = assistant.make_client  # tests replace it with a fake Claude
 
     # Token auth (not cookies) protects the API, so any origin may call it; restrict with MOLCURATOR_CORS_ORIGINS.
+    # Compress responses: the web app's structure library shrinks from 3.5 MB to about 1 MB, which
+    # matters behind a tunnel (ngrok's free plan allows 1 GB a month).
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
     app.include_router(routes.public)
     app.include_router(routes.system)

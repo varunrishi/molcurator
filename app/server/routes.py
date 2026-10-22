@@ -20,7 +20,7 @@ from starlette.background import BackgroundTask
 
 from molcurator.config import RunConfig, load_config
 
-from . import __version__, capabilities, chem, run_files
+from . import __version__, assistant, capabilities, chem, run_files
 from .run_manager import RunConflict, RunManager
 from .settings import Settings
 
@@ -106,26 +106,30 @@ def system_info(request: Request) -> dict:
     """External programs found on the server, what this version supports, and the run limit."""
     s = settings_of(request)
     return {"version": __version__, "tools": capabilities.tool_status(s), "capabilities": capabilities.capabilities(),
-            "limits": {"max_concurrent_runs": s.max_runs, "running": runs_of(request).running_ids()}}
+            "limits": {"max_concurrent_runs": s.max_runs, "running": runs_of(request).running_ids()},
+            "assistant": {"available": assistant.available(s), "model": assistant.model_name(s)}}
 
 
 @system.get("/presets")
 def presets(request: Request) -> list[dict]:
     """The use-case configs shipped in configs/*.yaml, with every default filled in."""
     out = []
+    orca_found = capabilities.tool_status(settings_of(request))["orca"]["found"]
     for path in sorted((settings_of(request).repo / "configs").glob("*.yaml")):
         text = path.read_text()
         try:  # load_config, as the CLI does: it also reads `seeds_file:` (a seeds CSV next to the YAML)
-            config = load_config(path).model_dump(mode="json")
+            parsed = load_config(path)
         except (ValueError, OSError):  # an invalid config (ValidationError is a ValueError) or a missing seeds file
             continue
+        config = parsed.model_dump(mode="json")
+        level = capabilities.predict_level(parsed)
         notes = []
         if "PLACEHOLDER" in text:
             notes.append("The seed in this preset is a placeholder; replace it with your own molecule.")
-        target_ok = capabilities.supported(capabilities.TARGETS, config["target"]["name"])
-        out.append({"name": path.stem, "file": f"configs/{path.name}", "supported": target_ok,
-                    "reason": None if target_ok else f"Target {config['target']['name']} is not supported yet.",
-                    "notes": notes, "config": config})
+        if not level["xtb"] and not orca_found:
+            notes.append(f"PREDICT runs {level['label']} through ORCA, which was not found on this server.")
+        out.append({"name": path.stem, "file": f"configs/{path.name}", "supported": True, "reason": None,
+                    "predict_level": level, "notes": notes, "config": config})
     return out
 
 
@@ -150,6 +154,33 @@ def validate_config(body: ConfigBody, request: Request) -> dict:
 def inspect_molecule(body: InspectBody) -> dict:
     """Canonical SMILES (RDKit), problems the tools would reject, and a quick 3D preview."""
     return chem.inspect_smiles(body.smiles, with_xyz=body.xyz)
+
+
+class PlanBody(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000, description="What the user wants, in plain language.")
+    current: dict[str, Any] | None = Field(None, description="The proposal being refined (from a previous answer).")
+
+
+@system.post("/assistant/plan")
+def assistant_plan(body: PlanBody, request: Request) -> dict:
+    """Turn a prompt into a proposed run config with Claude, checked like any other config.
+    Nothing is started: the client shows the proposal and starts it with POST /api/runs."""
+    s = settings_of(request)
+    if not assistant.available(s):
+        raise HTTPException(503, "The assistant needs ANTHROPIC_API_KEY on the server.")
+    shipped = presets(request)
+    if not shipped:
+        raise HTTPException(500, "No valid preset in configs/*.yaml to start a proposal from.")
+    client = request.app.state.assistant_client(s)
+    try:
+        draft = assistant.ask_claude(client, assistant.model_name(s), body.prompt, body.current)
+    except ValueError as e:
+        raise HTTPException(502, f"Claude's answer could not be used: {e}")
+    except Exception as e:  # API errors, timeouts: reported, never replaced by a guess
+        raise HTTPException(502, f"Claude could not be reached: {type(e).__name__}: {e}")
+    plan = assistant.build_plan(draft, shipped, body.current, s)
+    plan["model"] = assistant.model_name(s)
+    return json_safe(plan)
 
 
 # ====================================================================== runs
