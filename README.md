@@ -6,6 +6,17 @@
 
 MolCurator is an AI agent that creates and curates a benchmark set of molecules, starting from a seed molecule with a desired property.
 
+## Contents
+- [Idea](#idea)
+- [Approach](#approach)
+- [Tools](#tools)
+- [Installation](#installation)
+- [Running the agent](#running-the-agent)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [References](#references)
+
 ## Idea
 
 Given a seed molecule and a target property (e.g. a HOMO-LUMO gap range), the agent generates candidate molecules, screens them with fast ML predictions, confirms the promising ones with quantum chemistry, and assembles a curated benchmark dataset of molecules that actually have the desired property.
