@@ -29,10 +29,9 @@
     defaultApiBase: defaultApiBase,
     apiBase: () => { const v = read("apiBase"); return v === null ? defaultApiBase() : v; },
     token: () => read("token") || "",
-    repoUrl: () => read("repoUrl") || "",            // "" = use the server's or the default
     pollSeconds: () => Math.max(2, parseInt(read("pollSeconds"), 10) || 5),
     theme: () => read("theme"),
-    save: function (values) {                        // values: any of apiBase, token, repoUrl, pollSeconds, theme
+    save: function (values) {                        // values: any of apiBase, token, pollSeconds, theme
       Object.keys(values).forEach((k) => write(k, values[k] == null ? null : String(values[k]).trim()));
     }
   };

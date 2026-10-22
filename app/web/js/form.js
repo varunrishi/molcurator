@@ -200,6 +200,19 @@
     if (!editor) $("editorFallback").style.display = "flex";
   }
 
+  // The vendored editor keeps the size it had when created, so rebuild it when the window resizes.
+  const rebuildEditor = debounce(function () {
+    if (!editor || $("paneDraw").hidden) return;
+    const smiles = editor.getSmiles();
+    const el = $("editor");
+    el.innerHTML = "";
+    editor = null;
+    initEditor();
+    if (editor && smiles) {
+      try { syncingEditor = true; editor.setSmiles(smiles); } catch (e) { /* ignore */ } finally { syncingEditor = false; }
+    }
+  }, 300);
+
   function selectSeedTab(which) {
     const draw = which === "draw";
     $("tabDraw").setAttribute("aria-selected", draw);
@@ -294,6 +307,7 @@
     $("tabDraw").addEventListener("click", () => selectSeedTab("draw"));
     $("tabSmiles").addEventListener("click", () => selectSeedTab("smiles"));
     $("startBtn").addEventListener("click", start);
+    window.addEventListener("resize", rebuildEditor);
   }
 
   MOL.form = {

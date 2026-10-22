@@ -65,7 +65,7 @@ header.bar{position:sticky;top:0;z-index:30;background:var(--panel);border-botto
 @media (max-width:480px){#connText{display:none}.brand .logo{font-size:16px}}
 .brand{flex:none}
 
-main{flex:1;display:grid;grid-template-columns:minmax(360px,460px) minmax(0,1fr);gap:16px;
+main{flex:1;display:grid;grid-template-columns:minmax(380px,540px) minmax(0,1fr);gap:16px;
   padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));
   width:100%;max-width:1500px;margin:0 auto;align-items:start}
 @media (max-width:960px){main{grid-template-columns:minmax(0,1fr)}}
@@ -166,7 +166,7 @@ textarea.smiles{width:100%;min-height:52px;background:var(--sunken);border:1px s
 .range-io > input{width:74px;background:var(--sunken);border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 8px;font-family:var(--font-mono);font-size:13px;text-align:center}
 .range-io .unit,.range-io .sep{color:var(--ink-faint);font-size:12px}
 
-#editorWrap{position:relative;height:280px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--mol-tile)}
+#editorWrap{position:relative;height:clamp(380px,58vh,560px);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--mol-tile)}
 #editor{position:absolute;inset:0}
 #editorFallback{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:20px;color:#5b666e;font-size:13px}
 .seedcheck{font-size:12.5px;margin-top:8px;word-break:break-all}
@@ -174,9 +174,9 @@ textarea.smiles{width:100%;min-height:52px;background:var(--sunken);border:1px s
 .seedcheck code{font-size:12px}
 .warn-line{color:var(--warn);margin-top:4px}
 .seed-preview{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.depict-sm{height:150px;background:var(--mol-tile);border:1px solid var(--line);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.depict-sm{height:170px;background:var(--mol-tile);border:1px solid var(--line);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .depict-sm svg{max-width:100%;max-height:100%}
-#viewer3d{position:relative;height:150px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--sunken)}
+#viewer3d{position:relative;height:170px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--sunken)}
 .v3d-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:12.5px;text-align:center;padding:12px}
 
 .checks{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
@@ -296,7 +296,7 @@ ul.plain{margin:0;padding-left:18px;font-size:12.5px}
 
 /* ---------------- dialogs ---------------- */
 .dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--ink);padding:0;width:min(520px,calc(100% - 32px));box-shadow:var(--shadow)}
-.dialog.wide{width:min(680px,calc(100% - 32px))}
+.dialog.wide{width:min(860px,calc(100% - 32px))}
 .dialog::backdrop{background:color-mix(in srgb,#060a0c 55%,transparent)}
 .dialog form{display:flex;flex-direction:column;max-height:calc(100vh - 64px)}
 .dialog-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
@@ -309,12 +309,21 @@ ul.plain{margin:0;padding-left:18px;font-size:12.5px}
 .doc ul.levels li{margin-bottom:8px}
 .doclinks{display:flex;flex-wrap:wrap;gap:8px}
 
-/* ---------------- footer ---------------- */
-.foot{width:100%;max-width:1500px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
-.contributors{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
-.person{display:flex;align-items:center;gap:10px;font-size:13px}
-.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700}
-.foot-links{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink-faint)}
+/* ---------------- documentation: contributors ---------------- */
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-top:6px}
+.person{display:flex;gap:12px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px}
+.avatar{width:48px;height:48px;border-radius:50%;flex:none;object-fit:cover;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;border:1px solid var(--line)}
+.person-text{min-width:0;display:flex;flex-direction:column;gap:3px}
+.person-name{font-weight:600;font-size:14px}
+.person-focus{font-size:12.5px;color:var(--accent);font-weight:600}
+.person-also{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.person-also .chip{font-size:10.5px;padding:2px 7px}
+.person .note{margin:2px 0 0;font-size:11.5px}
+.person-links{display:flex;flex-direction:column;gap:1px;margin-top:4px;font-size:12px;word-break:break-all}
+.person-links a{text-decoration:none}
+.person-links a:hover{text-decoration:underline}
+.doc-foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint)}
 
 /* ---------------- toast ---------------- */
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);

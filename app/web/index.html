@@ -317,8 +317,6 @@
       <div class="field"><label for="setToken">API token</label>
         <div class="row"><input id="setToken" class="text grow" type="password" spellcheck="false" autocomplete="off" placeholder="printed by the server at startup">
           <button type="button" class="btn sm" id="showToken">Show</button></div></div>
-      <div style="display: none;" class="field"><label for="setRepo">Source code link</label>
-        <input id="setRepo" class="text" spellcheck="false" placeholder="(the server's default)"></div>
       <div class="field"><label for="setPoll">Refresh a running run every (seconds)</label>
         <input id="setPoll" class="text" type="number" min="2" max="120"></div>
       <div id="settingsResult" class="checks"></div>
@@ -336,43 +334,8 @@
 <dialog id="docsDialog" class="dialog wide" aria-labelledby="docsTitle">
   <form method="dialog">
     <div class="dialog-head"><h3 id="docsTitle">Documentation</h3><button class="iconbtn" value="close" aria-label="Close">✕</button></div>
-    <div class="dialog-body doc">
-      <!-- <h4>What a run does</h4>
-      <p>MolCurator searches for molecules whose property lies in a target window, starting from your seed. Each round it:</p>
-      <ol>
-        <li><b>Plans</b> the round (rules or an LLM) and <b>generates</b> new molecules from the best ones so far (STONED SELFIES).</li>
-        <li>Runs <b>xTB</b> on a random sample of them (30 MMFF94 conformers, then one GFN2-xTB calculation each).</li>
-        <li><b>Trains an ML model</b> once enough xTB values exist, and estimates the rest with it.</li>
-        <li><b>Screens</b> candidates against the window plus the margin.</li>
-        <li>With QM on, sends the closest candidates to <b>QM</b> (ORCA DFT) within the QM budget.</li>
-        <li><b>Curates</b> molecules whose best estimate is inside the window, then decides whether to continue.</li>
-      </ol>
-      <p>A run stops at the dataset size, or when rounds, QM calls or time run out. Stopped runs can be resumed.</p>
-      <h4>How far to trust a value</h4>
-      <ul class="levels">
-        <li><span class="lvbadge qm">QM</span> DFT single point (e.g. B3LYP/def2-SVP). The level the target window is meant for.</li>
-        <li><span class="lvbadge xtb">xTB</span> GFN2-xTB, semi-empirical. Fast but offset from DFT: in the repo's local analysis, B3LYP gaps were on average 2.55 eV higher than xTB gaps (60 molecules).</li>
-        <li><span class="lvbadge ml">ML</span> Model trained on xTB values. The README reports a test error of about 0.5 eV: a candidate to check, not a result.</li>
-      </ul> -->
-      
-      <div class="doclinks" style="display:none;">
-        <a class="btn sm" id="docApi" target="_blank" rel="noopener">Interactive API reference</a>
-        <a class="btn sm" id="docGuide" target="_blank" rel="noopener">API guide (docs/api)</a>
-        <a class="btn sm" id="docReadme" target="_blank" rel="noopener">Project README</a>
-        <a class="btn sm" id="docTrace" target="_blank" rel="noopener">Trace format</a>
-      </div>
-      <div class="section">
-        <div class="eyebrow">Contributors</div>
-        <div id="contributors" class="contributors"></div>
-      </div>
-      <div class="section foot-links">
-        <span>MolCurator · Apache-2.0</span>
-        <span class="grow"></span>
-        <button class="linkbtn" id="footDocs">Documentation</button>
-        <a class="linkbtn" id="footSource" target="_blank" rel="noopener">Source code</a>
-        <a class="linkbtn" id="footApi" target="_blank" rel="noopener">API reference</a>
-      </div>
-    </div>
+    <!-- Filled from templates/documentation.html each time the dialog opens (js/app.js). -->
+    <div class="dialog-body doc" id="docsBody"><p class="note">Loading…</p></div>
   </form>
 </dialog>
 

@@ -1,6 +1,7 @@
 /* app.js — starts the app: connects to the server, and wires the header (connection status,
- * Docs, Source code, Settings, theme), the Settings and Documentation dialogs, and the
- * Contributors section. The panels themselves live in form.js and monitor.js. */
+ * Docs, Source code, Settings, theme) and the Settings and Documentation dialogs. The
+ * documentation text comes from templates/documentation.html. The panels themselves live in
+ * form.js and monitor.js. */
 (function () {
   "use strict";
   const { $, esc, toast } = MOL.ui;
@@ -70,19 +71,13 @@
   }
 
   // ------------------------------------------------------------------ links
+  // The source code link is fixed: the server's repo_url, else the project's GitHub repository.
   function repoUrl() {
-    return (config.repoUrl() || serverRepoUrl || config.DEFAULT_REPO_URL).replace(/\/+$/, "");
+    return (serverRepoUrl || config.DEFAULT_REPO_URL).replace(/\/+$/, "");
   }
 
   function updateLinks() {
-    const repo = repoUrl();
-    $("sourceBtn").href = repo;
-    $("footSource").href = repo;
-    $("footApi").href = api.docsUrl();
-    $("docApi").href = api.docsUrl();
-    $("docGuide").href = repo + "/tree/main/docs/api";
-    $("docReadme").href = repo + "#readme";
-    $("docTrace").href = repo + "/blob/main/docs/trace-format.md";
+    $("sourceBtn").href = repoUrl();
   }
 
   // ------------------------------------------------------------------ settings dialog
@@ -92,8 +87,6 @@
     $("setApi").placeholder = config.defaultApiBase() || "(this page's server)";
     $("setToken").value = config.token();
     $("setToken").type = "password"; $("showToken").textContent = "Show";
-    $("setRepo").value = config.repoUrl();
-    $("setRepo").placeholder = serverRepoUrl || config.DEFAULT_REPO_URL;
     $("setPoll").value = config.pollSeconds();
     $("settingsResult").innerHTML = "";
     $("settingsDialog").showModal();
@@ -133,21 +126,63 @@
     });
     $("settingsDialog").addEventListener("close", () => {
       if ($("settingsDialog").returnValue !== "save") return;
-      config.save({ apiBase: $("setApi").value, token: $("setToken").value, repoUrl: $("setRepo").value,
-                    pollSeconds: $("setPoll").value });
+      config.save({ apiBase: $("setApi").value, token: $("setToken").value, pollSeconds: $("setPoll").value });
       toast("Settings saved");
       updateLinks();
       connect();
     });
   }
 
-  // ------------------------------------------------------------------ docs, theme, contributors
-  function bindDocs() {
-    const open = () => { updateLinks(); $("docsDialog").showModal(); };
-    $("docsBtn").addEventListener("click", open);
-    $("footDocs").addEventListener("click", open);
+  // ------------------------------------------------------------------ documentation
+  // The dialog shows templates/documentation.html with its {{PLACEHOLDERS}} filled in. The file is
+  // read again each time, so edits show up without reloading the app.
+  async function openDocs() {
+    const body = $("docsBody");
+    $("docsDialog").showModal();
+    try {
+      const response = await fetch("templates/documentation.html", { cache: "no-cache" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const html = (await response.text()).replace(/<!--[\s\S]*?-->/g, "");
+      const values = { REPO_URL: esc(repoUrl()), API_DOCS_URL: esc(api.docsUrl()), CONTRIBUTORS: contributorsHtml() };
+      body.innerHTML = html.replace(/\{\{(\w+)\}\}/g, (match, key) => (key in values ? values[key] : match));
+      body.querySelectorAll("img.avatar").forEach((img) => img.addEventListener("error", () => {
+        const fallback = document.createElement("span");      // GitHub unreachable: show the initial
+        fallback.className = "avatar";
+        fallback.textContent = img.dataset.initial;
+        img.replaceWith(fallback);
+      }));
+    } catch (e) {
+      body.innerHTML = '<p class="problem">The documentation could not be loaded (' + esc(e.message) + "). " +
+        "It is read from <code>templates/documentation.html</code>, which needs the app to be opened from a web server, " +
+        "not from a file on disk.</p>";
+    }
   }
 
+  // One card per person in js/contributors.js. The avatar comes from GitHub; if it cannot load,
+  // the person's initial is shown instead.
+  function contributorsHtml() {
+    const people = MOL.contributors || [];
+    if (!people.length) return '<p class="note">No contributors listed yet.</p>';
+    return '<div class="people">' + people.map((p) => {
+      const initial = esc((p.name || "?").trim().charAt(0).toUpperCase());
+      const avatar = p.github
+        ? `<img class="avatar" src="https://github.com/${encodeURIComponent(p.github)}.png?size=96" alt="" loading="lazy" data-initial="${initial}">`
+        : `<span class="avatar">${initial}</span>`;
+      const links = [
+        p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : "",
+        p.github ? `<a href="https://github.com/${encodeURIComponent(p.github)}" target="_blank" rel="noopener">github.com/${esc(p.github)}</a>` : ""
+      ].filter(Boolean).join("");
+      const also = (p.also || []).map((a) => `<span class="chip">${esc(a)}</span>`).join("");
+      return `<div class="person">${avatar}<div class="person-text">` +
+        `<div class="person-name">${esc(p.name)}</div>` +
+        (p.focus ? `<div class="person-focus">${esc(p.focus)}</div>` : "") +
+        (also ? `<div class="person-also">${also}</div>` : "") +
+        (p.note ? `<div class="note">${esc(p.note)}</div>` : "") +
+        `<div class="person-links">${links}</div></div></div>`;
+    }).join("") + "</div>";
+  }
+
+  // ------------------------------------------------------------------ theme
   function initTheme() {
     const saved = config.theme();
     if (saved) document.documentElement.setAttribute("data-theme", saved);
@@ -160,17 +195,6 @@
     });
   }
 
-  function renderContributors() {
-    const people = MOL.contributors || [];
-    $("contributors").innerHTML = people.length
-      ? people.map((p) => {
-          const name = p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>` : esc(p.name);
-          return `<div class="person"><span class="avatar">${esc((p.name || "?").trim().charAt(0).toUpperCase())}</span>` +
-                 `<span><b>${name}</b>${p.role ? `<br><span class="note">${esc(p.role)}</span>` : ""}</span></div>`;
-        }).join("")
-      : '<p class="note">No contributors listed yet.</p>';
-  }
-
   // ------------------------------------------------------------------ start
   function boot() {
     if (!MOL.chem.hasOCL()) {
@@ -178,8 +202,7 @@
     }
     initTheme();
     bindSettings();
-    bindDocs();
-    renderContributors();
+    $("docsBtn").addEventListener("click", openDocs);
     updateLinks();
     MOL.form.init((runId) => MOL.monitor.refreshList(runId));
     MOL.monitor.init();

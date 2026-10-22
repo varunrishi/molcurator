@@ -1,8 +1,9 @@
 # MolCurator web app
 
-Plain HTML, CSS and JavaScript: no build step. The API server serves it at `/`
-(`./run.sh`, then open http://127.0.0.1:8000). It can also be opened from any static host or
-from disk, pointed at a server in **Settings**.
+Plain HTML, CSS and JavaScript: no build step. The API server serves it at `/` (`./run.sh`,
+then open http://127.0.0.1:8000). Any static host works too (e.g. GitHub Pages), pointed at a
+server in **Settings**. Open it from a web server rather than as a file on disk: the Docs
+dialog reads `templates/documentation.html`, which browsers block for local files.
 
 ## What it does
 
@@ -14,8 +15,9 @@ from disk, pointed at a server in **Settings**.
   open one for its 3D geometry, read the summary, run the trajectory evaluator, read the
   process log, stop, resume, download.
 - **Header**: connection status, **Docs**, **Source code**, **Settings** (server address, API
-  token, source link, refresh interval), light/dark theme.
-- **Contributors** at the bottom, from `js/contributors.js`.
+  token, refresh interval), light/dark theme.
+- **Docs** shows `templates/documentation.html`, including the contributors from
+  `js/contributors.js` with their GitHub avatars. Edit the template to change the text.
 
 Every number shown comes from the server. If the server cannot be reached, the app says so;
 it never shows estimated or example values instead.
@@ -33,8 +35,9 @@ it never shows estimated or example values instead.
 | `js/viewer.js` | 3Dmol.js wrapper for XYZ geometries |
 | `js/form.js` | the New run panel |
 | `js/monitor.js` | the Runs panel |
-| `js/app.js` | start-up, connection, header, Settings and Docs dialogs, contributors |
-| `js/contributors.js` | the people listed under Contributors (empty for now) |
+| `js/app.js` | start-up, connection, header, Settings and Docs dialogs, contributor cards |
+| `js/contributors.js` | the people listed in the documentation (name, email, GitHub, areas) |
+| `templates/documentation.html` | text of the Docs dialog, with `{{REPO_URL}}`, `{{API_DOCS_URL}}` and `{{CONTRIBUTORS}}` placeholders |
 | `lib/` | OpenChemLib 8.15.0 and 3Dmol.js, vendored so the app works offline |
 
 Scripts are ordinary `<script>` tags sharing one global, `MOL`; their order in `index.html`

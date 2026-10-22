@@ -45,6 +45,7 @@
     }
     if (OCL && OCL.StructureEditor) {
       const el = document.getElementById(elementId);
+      el.removeAttribute("style");               // drop styles a previous editor left (it sets position:relative)
       el.style.width = el.clientWidth + "px";   // this editor sizes itself from the element's inline size
       el.style.height = el.clientHeight + "px";
       const ed = OCL.StructureEditor.createSVGEditor(elementId, 1);
