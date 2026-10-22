@@ -20,9 +20,10 @@ def target_window(config: RunConfig) -> str:
 
 
 def round_lines(stats: list) -> list[str]:
-    """One line per finished round, every value named: unlabeled columns get misread by the model."""
+    """One line per finished round, every value named: unlabeled columns get misread by the model.
+    No column is called "hits": with screened_in next to it, the model reported the screened-in total as hits."""
     return [f"round {s['round']}: generated={s['generated']}, duplicates={s['duplicates']}, xtb={s['xtb_runs']}, "
-            f"ml={s['ml_predicted']}, screened_in={s['screened_in']}, hits={s['hits']}" for s in stats]
+            f"ml={s['ml_predicted']}, passed_screen={s['screened_in']}, added_to_dataset={s['hits']}" for s in stats]
 
 
 def plan_round_prompt(state: AgentState, config: RunConfig) -> str:
@@ -39,7 +40,7 @@ def plan_round_prompt(state: AgentState, config: RunConfig) -> str:
     if state["round_stats"]:
         s = state["round_stats"][-1]
         lines.append(f"Last round: plan {state['round_plan']}; generated {s['generated']}, duplicates {s['duplicates']}, "
-                     f"screened in {s['screened_in']}, hits {s['hits']}.")
+                     f"passed the screen {s['screened_in']}, added to the dataset {s['hits']}.")
     lines.append(f"Allowed: generator in {limits.generators}, n_candidates 1-{limits.max_candidates}, "
                  f"mutation_strength 1-{limits.max_mutation_strength}, 1-10 parents.")
     return "\n".join(lines)
@@ -65,7 +66,8 @@ def summary_prompt(state: AgentState, config: RunConfig) -> str:
              f"MolCurator run for a chemist. Use only the numbers given here.",
              f"Target: {config.target.name} {target_window(config)}. Seeds: {', '.join(config.seeds)}.",
              "Rounds (xtb = molecules computed with xTB; ml = scored by the ML model, 0 means ML was not used; "
-             "screened_in = passed the screen; hits = added to the dataset):"]
+             "passed_screen = inside the target window plus margin; added_to_dataset = new molecules curated. "
+             "Only added_to_dataset counts as hits; never call passed_screen hits):"]
     lines += round_lines(state["round_stats"])
     lines += [f"Last round's plan: {state['round_plan']}. Earlier rounds' settings are not recorded here, "
               "so do not describe them.",
