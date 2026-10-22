@@ -100,14 +100,31 @@ def screen_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
 
 def validate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     """VALIDATE: QM value for each molecule in this round's QM batch, which is already trimmed to the
-    QM budget (R4.2) and possibly edited at approval (R5.2). An empty batch runs no QM."""
+    QM budget (R4.2) and possibly edited at approval (R5.2). An empty batch runs no QM.
+    qm_batch is left as selected; close_round counts the QM and extra xTB calls from the records."""
     if not state["qm_batch"]:
         return {}
     molecules = dict(state["molecules"])
+    # An ML-only molecule has no geometry, and QM needs one to start from: xTB first gives it a
+    # geometry and an xTB value; if xTB fails, it is marked failed and skips QM ("option A", plan.md).
+    no_geometry = [Candidate(id=i, smiles=molecules[i]["smiles"], parent_smiles=molecules[i]["parent"],
+                             round=molecules[i]["round"], generator=state["round_plan"]["generator"])
+                   for i in state["qm_batch"] if molecules[i]["xyz_path"] is None]
+    if no_geometry:
+        results = tools.predict(no_geometry, config.target, Path(state["run_dir"]) / "xyz")
+        if sorted(p.candidate_id for p in results) != sorted(c.id for c in no_geometry):
+            raise ValueError("predict must return exactly one result per candidate (R2.4)")
+        for p in results:
+            molecules[p.candidate_id] = {**molecules[p.candidate_id], "xtb": p.value, "error": p.error,
+                                         "xyz_path": str(p.xyz_path) if p.xyz_path else None,
+                                         **({} if p.status is Status.ok else {"status": "failed"})}
+    batch = [i for i in state["qm_batch"] if molecules[i]["xyz_path"] is not None]
+    if not batch:
+        return {"molecules": molecules}
     items = [Prediction(candidate_id=i, status=Status.ok, value=molecules[i]["xtb"], xyz_path=molecules[i]["xyz_path"])
-             for i in state["qm_batch"]]  # QM starts from each molecule's xTB geometry
+             for i in batch]  # QM starts from each molecule's xTB geometry
     results = tools.validate(items, config.target, config.qm)
-    if sorted(q.candidate_id for q in results) != sorted(state["qm_batch"]):
+    if sorted(q.candidate_id for q in results) != sorted(batch):
         raise ValueError("validate must return exactly one result per molecule (R2.4)")
     for q in results:
         ok = q.status is Status.ok
@@ -145,16 +162,22 @@ def close_round_node(state: AgentState, config: RunConfig, tools: Toolset) -> di
     batch_records = [molecules[i] for i in batch]
     failed = {m["id"] for m in this_round + batch_records if m["status"] == "failed"}
     passed = {"screened_in", "selected", "validated", "curated"}
-    # A QM failure has an xTB value (it passed the screen first); an xTB failure has none.
-    screened_in = [m for m in this_round if m["status"] in passed or (m["status"] == "failed" and m["xtb"] is not None)]
+    # A QM failure has an xTB value (it passed the screen first); a PREDICT failure has none. Every
+    # QM-batch molecule passed the screen, including an ML-only one whose xTB then failed in VALIDATE.
+    screened_in = [m for m in this_round if m["status"] in passed or m["id"] in batch
+                   or (m["status"] == "failed" and m["xtb"] is not None)]
+    # In VALIDATE, ML-only batch molecules (the only ones with an ML value) got xTB first, and QM ran
+    # on those with a geometry; molecules whose extra xTB failed made no QM call.
+    extra_xtb = sum(m["ml"] is not None for m in batch_records)
+    qm_calls = sum(m["xyz_path"] is not None for m in batch_records)
     new = [m for m in this_round if m["status"] != "duplicate"]
     stats = RoundStats(round=r, generated=len(this_round),
                        duplicates=len(this_round) - len(new),
-                       xtb_runs=min(config.predict.n_xtb, len(new)),  # same size PREDICT sampled (R10.1)
+                       xtb_runs=min(config.predict.n_xtb, len(new)) + extra_xtb,  # PREDICT's sample (R10.1) + VALIDATE's
                        ml_predicted=sum(m["ml"] is not None for m in this_round),
                        unscored=sum(m["status"] == "unscored" for m in this_round),
                        failed=len(failed), screened_in=len(screened_in),
-                       selected=len(batch), qm_calls=len(batch),
+                       selected=len(batch), qm_calls=qm_calls,
                        # dataset growth this round: right with QM on or off, and on resume (curate is idempotent)
                        hits=state["dataset_size"] - sum(s["hits"] for s in state["round_stats"]))
     return {"round_stats": [*state["round_stats"], stats]}

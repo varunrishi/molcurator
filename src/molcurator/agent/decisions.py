@@ -8,7 +8,7 @@ from typing import Generic, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, Field
 
-from molcurator.agent.budgets import budget_stop_reason, qm_calls_left
+from molcurator.agent.budgets import budget_stop_reason, qm_share_this_round
 from molcurator.agent.state import AgentState
 from molcurator.agent.summaries import parent_options, screened_candidates
 from molcurator.config import RunConfig
@@ -109,14 +109,15 @@ class RuleDecider:
         return Decided(plan, source="rule", fallback="rules_mode")
 
     def select_qm_batch(self, state: AgentState, config: RunConfig) -> Decided[QMBatchDecision]:
-        # Closest to the target first, up to the QM calls left.
-        ids = [m["id"] for m in screened_candidates(state, config)[: qm_calls_left(state, config.budget)]]
-        batch = QMBatchDecision(select=ids, reason=f"Rule: the {len(ids)} screened candidates closest to the target.")
+        # Closest to the target first, up to this round's even share of the QM calls left.
+        ids = [m["id"] for m in screened_candidates(state, config)[: qm_share_this_round(state, config.budget)]]
+        batch = QMBatchDecision(select=ids, reason=f"Rule: the {len(ids)} screened candidates closest to the target "
+                                                   "(an even share of the QM calls left per round).")
         return Decided(batch, source="rule", fallback="rules_mode")
 
     def continue_or_stop(self, state: AgentState, config: RunConfig) -> Decided[ContinueDecision]:
         # Continue while any budget remains; the graph enforces budgets either way (R4.3).
-        limit = budget_stop_reason(state, config.budget)
+        limit = budget_stop_reason(state, config.budget, config.qm.enabled)
         choice = ContinueDecision(decision="stop" if limit else "continue",
                                   reason=f"Rule: stop, {limit} reached." if limit else "Rule: budget remains.")
         return Decided(choice, source="rule", fallback="rules_mode")

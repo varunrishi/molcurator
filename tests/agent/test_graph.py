@@ -1,9 +1,10 @@
 """The v1 graph end to end with FakeTools and the rules, QM off (Phase 2, R1, R4, R10)."""
 import csv
+import json
 from pathlib import Path
 
 from molcurator.agent.decisions import RuleDecider
-from molcurator.agent.graph import NODES, build_graph, initial_state
+from molcurator.agent.graph import NODES, QM_STEPS, build_graph, initial_state, nodes_for
 from molcurator.agent.toolset import Toolset
 from molcurator.agent.trace import TraceWriter, write_run_start
 from molcurator.config import RunConfig, load_config
@@ -76,3 +77,14 @@ def test_crashed_tool_step_stops_run_and_writes_summary(tmp_path):
     assert state["stop_reason"] == "error" and state["error"].startswith("predict: ")
     assert state["round_stats"] == [] and state["dataset_size"] == 0  # skipped the rest of the round
     assert "Stopped because: error." in (tmp_path / "summary.md").read_text()
+
+
+def test_qm_off_has_no_qm_steps_and_ignores_the_qm_budget(tmp_path):
+    """R11.1, R4.1: with no qm: section the graph has no QM nodes, and max_qm_calls (even 0) never stops the run."""
+    config = load_config(CONFIG)
+    assert not config.qm.enabled and nodes_for(config) == NODES and not set(QM_STEPS) & set(NODES)
+    state = run_graph(tmp_path, max_qm_calls=0, max_rounds=2, target_dataset_size=1000)
+    assert state["stop_reason"] == "max_rounds" and len(state["round_stats"]) == 2
+    assert all(s["selected"] == s["qm_calls"] == 0 for s in state["round_stats"])
+    lines = (tmp_path / "traces" / "trace.jsonl").read_text().splitlines()
+    assert not {json.loads(line)["node"] for line in lines} & set(QM_STEPS)  # no QM lines in the trace

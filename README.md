@@ -82,7 +82,7 @@ At the end it lists anything it could not do automatically.
 
 - **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
 - **Ollama** (optional, for a local model): https://ollama.com/download.
-- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package). QM is off by default, so ORCA is only needed with `qm.enabled: true`.
+- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package). QM is off by default, so ORCA is only needed when the run config has a `qm:` section.
 - **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
 
 ### Choosing the LLM
@@ -130,10 +130,31 @@ The agent works in rounds. Each round it:
 2. runs xTB on a random sample of them (`predict.n_xtb`)
 3. trains an ML model once enough xTB values exist (`train.min_examples`), and scores the rest with it
 4. screens the candidates against the target window
-5. adds hits to the dataset
+5. with QM on only: sends the screened candidates closest to the target to QM (VALIDATE)
+6. adds hits to the dataset
 
 It stops when the dataset reaches `budget.target_dataset_size`, or when another budget runs out:
 `max_rounds`, `max_qm_calls` or `max_wall_time`.
+
+**QM is optional.** It runs only when the config has a `qm:` section naming the method, as
+commented out in `configs/homo_lumo.yaml`:
+
+```yaml
+qm:
+  backend: orca
+  functional: B3LYP
+  basis: def2-SVP
+```
+
+With QM on:
+- SELECT QM BATCH and VALIDATE run between SCREEN and CURATE.
+- Only QM-validated molecules inside the target window are curated.
+- `budget.max_qm_calls` caps the number of QM calculations, one per molecule. The rules spread it
+  evenly: each round gets calls left ÷ rounds left, and calls a round doesn't use go to later rounds.
+- A molecule chosen for QM that has only an ML value gets xTB first, for a starting geometry. If
+  that xTB fails, it skips QM.
+
+`enabled: false` keeps the section but skips QM.
 
 Each step prints a line when it finishes:
 
@@ -178,7 +199,9 @@ summary.
 - **Decisions use rules** (`decisions: rules` in the configs). Set `decisions: llm` to have Claude Haiku 4.5 plan
   rounds, decide whether to continue and write the summary; it needs `ANTHROPIC_API_KEY` in `.env`, and the
   rules take over whenever an answer is invalid or late.
-- **QM validation is off** (`qm.enabled: false`) and not yet wired into the agent.
+- **QM is off in the shipped configs** (their `qm:` sections are commented out). With QM on, there is no
+  human approval step before QM yet (`--approve-qm`), and `decisions: llm` still uses the rule to choose
+  the QM batch. The trajectory evaluator reports QM runs as `not_assessable`.
 - **Molecules screened in by ML alone are curated too,** with an empty `xtb` column in `dataset.csv`, and
   are also listed on their own in `dataset_ml_only.csv`. TRAIN learns only from xTB values, never from ML
   predictions, and starts once `train.min_examples` (150) xTB values exist. Its test MAE is about 0.5 eV and

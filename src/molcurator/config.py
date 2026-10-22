@@ -67,7 +67,9 @@ class QMConfig(QMSettings):
 
     model_config = ConfigDict(extra="forbid")  # extends the contract's model, so not a StrictModel
 
-    enabled: bool = False  # QM is slow, so the agent skips it unless a config turns it on (R11.1)
+    # On as soon as a config writes a qm: section naming its method; `enabled: false` keeps the
+    # section but skips QM. With no qm: section, RunConfig's default below has QM off (R11.1).
+    enabled: bool = True
 
 
 class RunConfig(StrictModel):
@@ -79,7 +81,7 @@ class RunConfig(StrictModel):
     screening: ScreeningSettings = ScreeningSettings()
     predict: PredictSettings = PredictSettings()
     train: TrainSettings = TrainSettings()
-    qm: QMConfig = QMConfig()  # ORCA by default; off unless enabled
+    qm: QMConfig = QMConfig(enabled=False)  # no qm: section: QM is slow, so it is skipped (R11.1)
     budget: BudgetSettings = BudgetSettings()
     decisions: Literal["llm", "rules"] = "llm"  # "rules": no LLM calls at all (R9.4)
     llm: LLMSettings = LLMSettings()

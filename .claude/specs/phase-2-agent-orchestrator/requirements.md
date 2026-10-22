@@ -139,8 +139,12 @@ output) and asks for a structured answer validated against a Pydantic model.
   get the final status `unscored` and are never selected for QM or curated.
 
 ## R11 — Optional QM validation and curation
-- R11.1 `qm.enabled` in the run config (default false, because QM is slow) turns QM validation
-  on or off. When off,
+- R11.1 QM validation runs only when the run config has a `qm:` section naming the method
+  (backend, functional, basis); with no `qm:` section it is off, because QM is slow.
+  `qm.enabled` is true by default inside a `qm:` section, and `enabled: false` keeps the
+  section but skips QM. The resolved `qm.enabled` is recorded in the trace's `run_start`.
+  (Changed from a plain `qm.enabled` flag, default false, so QM is used only when asked for.)
+  When off,
   SELECT QM BATCH, human approval and VALIDATE are skipped every round, and no QM budget is
   used.
 - R11.2 CURATE adds the molecules whose best estimate lies inside the target window (no

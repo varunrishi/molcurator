@@ -4,8 +4,9 @@ Every MolCurator agent run writes a trace: one record per node it ran, in order.
 describes the format so an evaluator can be built against it without reading the agent's code
 (Phase 2, R6.3). The format was agreed with the trajectory evaluator in issue #13.
 
-**Status: work in progress.** Version 1 covers the v1 agent: rules-only decisions, QM off.
-Sections marked *not in v1* will be added later; `trace_version` changes if a change breaks
+**Status: work in progress.** Version 1 covers the v1 agent: rules-only decisions, with optional QM
+(a `qm:` section in the config adds the `select_qm_batch` and `validate` lines; QM-off traces are
+unchanged). Sections marked *not in v1* will be added later; `trace_version` changes if a change breaks
 readers.
 
 ## File and writing rules
@@ -43,6 +44,8 @@ plan_round, ... , continue_or_stop                                              
 write_summary                                                                                     (once, last)
 ```
 
+With QM on, each round has `select_qm_batch, validate` between `screen` and `curate`.
+
 - Each node runs once per round, so `event_id` is unique within a run.
 - `continue_or_stop` is logged under the round it just closed.
 - If a tool step fails as a whole (`status: failed`), the next line is `write_summary`: the rest of
@@ -58,7 +61,7 @@ write_summary                                                                   
 |---|---|
 | `ok` | the node ran. A step that ran and found nothing (e.g. CURATE with no hits) is `ok`. |
 | `failed` | the whole step raised; `error` says which step and why. Per-molecule failures are **not** a failed line: they appear as `failed` entries in `outputs.results`. |
-| `skipped` | the node had nothing to do. `reason` is one of: `below_min_examples` (TRAIN: fewer xTB values than `train.min_examples`), `no_candidates_left` (ML PREDICT: every candidate got xTB), `empty_qm_batch` (VALIDATE, *not in v1*). |
+| `skipped` | the node had nothing to do. `reason` is one of: `below_min_examples` (TRAIN: fewer xTB values than `train.min_examples`), `no_candidates_left` (ML PREDICT: every candidate got xTB), `empty_qm_batch` (VALIDATE: the QM batch is empty). |
 
 ## Per-molecule results
 
@@ -77,7 +80,7 @@ Tool nodes put one compact entry per molecule they changed in `outputs.results`:
 | `generate` | canonical SMILES |
 | `predict` | xTB value (target units) |
 | `ml_predict` | ML estimate |
-| `validate` | QM value (*not in v1*) |
+| `validate` | QM value |
 | `screen`, `curate` | `null`; the status is the result |
 
 Only molecules the node **changed** are listed. Duplicates skipped by PREDICT, and failed molecules
@@ -94,6 +97,8 @@ that SCREEN leaves alone, are absent from that node's list.
 | `train` | `{}` | `model` (`model_path`, `n_examples`, `metrics`) |
 | `ml_predict` | `candidate_ids` | `results` |
 | `screen` | `candidate_ids` | `results` |
+| `select_qm_batch` | `candidate_ids` (the batch) | `qm_batch` (ids for VALIDATE, best first), `qm_batch_dropped` (`not_offered`: chosen ids that were not screened candidates; `over_budget`: cut to the QM calls left), `results` (status `selected`) |
+| `validate` | `candidate_ids` | `results`. A molecule with only an ML value first gets xTB for a geometry; if that fails, it is `failed` with the xTB error and gets no QM |
 | `curate` | `candidate_ids` (the hits) | `dataset_size` (total so far), `results`; `{}` when nothing was curated |
 | `close_round` | `{}` | `round_stats`: this round's counts (`generated`, `duplicates`, `xtb_runs`, `ml_predicted`, `unscored`, `failed`, `screened_in`, `selected`, `qm_calls`, `hits`) |
 | `continue_or_stop` | `{}` | `round` (the next round) when continuing, or `stop_reason` |
@@ -104,7 +109,7 @@ that SCREEN leaves alone, are absent from that node's list.
 
 ## The `llm` block (decision nodes)
 
-Present on `plan_round`, `continue_or_stop` and `write_summary` **only when the decider was
+Present on `plan_round`, `select_qm_batch`, `continue_or_stop` and `write_summary` **only when the decider was
 asked**. `continue_or_stop` has none when a budget limit ended the run, since budgets are checked
 in code before the decider.
 
@@ -122,7 +127,7 @@ In v1 (rules mode) every block has `source: rule` and `fallback: rules_mode`.
 ## The `run_start` line
 
 The first line of every trace. `inputs.config` holds the full settings, which explain absent or
-skipped steps: with `qm.enabled: false` there are no QM lines; `train.min_examples` explains a
+skipped steps: with `qm.enabled: false` (no `qm:` section) there are no QM lines; `train.min_examples` explains a
 skipped TRAIN; `predict.n_xtb` bounds PREDICT's sample; `budget` holds the limits. `resumed` is
 `false` for a new run.
 
@@ -143,9 +148,10 @@ last finished node, using the run's saved `config.yaml`.
 
 ## Not in v1
 
-- QM nodes (`select_qm_batch`, `approve_qm`, `validate`) and their lines.
+- `approve_qm` (human approval before QM) and its line.
 - Per-item `electronic_calls_attempted` / `cache_hit` for VALIDATE: needs a tool-contract change.
-  The agent caches nothing, so QM calls equal the batch size (`round_stats.qm_calls`).
+  The agent caches nothing, so `round_stats.qm_calls` is the number of batch molecules QM ran on
+  (those with a geometry).
 - `provider` and `model` in the `llm` block (with the LLM decider).
 
 ## Example
