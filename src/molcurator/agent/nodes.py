@@ -153,8 +153,10 @@ def curate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     Best estimate: with QM on, this round's QM-validated molecules; with QM off, screened-in ones."""
     molecules = dict(state["molecules"])
     inside = lambda v: v is not None and target_distance(v, config.target) <= 1e-9  # noqa: E731
-    pool = ([molecules[i] for i in state["qm_batch"] if molecules[i]["status"] == "validated"] if config.qm.enabled
-            else [m for m in molecules.values() if m["status"] == "screened_in"])
+    # pool = ([molecules[i] for i in state["qm_batch"] if molecules[i]["status"] == "validated"] if config.qm.enabled
+    #         else [m for m in molecules.values() if m["status"] == "screened_in"])
+    pool = [m for m in molecules.values()
+            if m["status"] in ("screened_in", "selected", "validated")]
     by_xtb = [m for m in molecules.values() if m["status"] != "curated" and inside(m["xtb"])]
     hits = list({m["id"]: m for m in by_xtb + [m for m in pool if inside(best_estimate(m))]}.values())
     if not hits:
