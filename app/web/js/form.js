@@ -25,14 +25,15 @@
 
   function buildConfig() {
     const cfg = JSON.parse(JSON.stringify(state.base || {}));
-    cfg.target = { name: $("targetSel").value, min: num("minIn"), max: num("maxIn"), units: "eV" };
+    // No units: the server uses the property's own unit (molcurator.chem.backends.check_target).
+    cfg.target = { name: $("targetSel").value, min: num("minIn"), max: num("maxIn") };
     cfg.seeds = [state.seed.canonical || $("smilesIn").value.trim()];
     cfg.screening = { margin: num("marginIn") };
     cfg.generation = cfg.generation || {};
     cfg.generation.defaults = Object.assign({}, cfg.generation.defaults, {
       generator: "stoned_selfies", n_candidates: num("nCand"), mutation_strength: num("mStrength") });
-    cfg.predict = { n_xtb: num("nXtb") };
-    cfg.train = { min_examples: num("minEx") };
+    cfg.predict = predictFor(cfg);
+    cfg.train = Object.assign({}, cfg.train, { min_examples: num("minEx") });
     cfg.qm = { enabled: $("qmOn").checked, backend: $("qmBackend").value,
                functional: $("qmFunctional").value.trim(), basis: $("qmBasis").value.trim() };
     const minutes = num("maxMinutes");
@@ -43,17 +44,64 @@
     return cfg;
   }
 
-  function applyConfig(cfg) {
+  // PREDICT settings for the config being built. The preset's predict section (e.g. the xTB-to-DFT
+  // gap correction in configs/homo_lumo.yaml) is kept while its target is chosen; for another
+  // target, the preset shipped for that target is used, else the default PREDICT level.
+  function predictFor(cfg) {
+    const target = $("targetSel").value;
+    let predict = state.base && state.base.target && state.base.target.name === target ? state.base.predict : null;
+    if (!predict) {
+      const preset = state.presets.find((p) => p.config.target.name === target);
+      predict = preset ? preset.config.predict : { correction: null };
+    }
+    const method = $("predictMethod").value.trim();
+    const out = Object.assign({}, predict, { n_xtb: num("nXtb"), method: method || null });
+    if (method !== ((predict && predict.method) || "")) out.basis = null;   // a basis belongs to its method
+    return out;
+  }
+
+  function targetInfo(name) {
+    const caps = state.system && state.system.capabilities;
+    return caps ? caps.targets.find((t) => t.name === (name || $("targetSel").value)) || null : null;
+  }
+
+  // Label for PREDICT values, e.g. "GFN2-xTB (corrected)" or "B97-3c", from the config being built.
+  function predictLabel(cfg) {
+    const info = targetInfo(cfg && cfg.target.name);
+    const p = (cfg && cfg.predict) || {};
+    const method = p.method || (info ? info.predict_method : "PREDICT");
+    return method + (p.correction ? " (corrected to DFT-like)" : "");
+  }
+
+  // Slider ranges for common targets (in their units); others get number fields only.
+  const SLIDER = { homo_lumo_gap: [0, 10], s1_t1_gap: [-1, 2], s0_t1_gap: [0, 6], s1_energy: [0, 8], t1_energy: [0, 8],
+    ionization_potential: [4, 14], electron_affinity: [-4, 4], dipole_moment: [0, 15] };
+
+  function updateTargetUnits() {
+    const info = targetInfo();
+    $("unitLabel").textContent = info ? (info.units || "no unit") : "";
+    const range = SLIDER[$("targetSel").value];
+    $("rangeWidget").hidden = !range;
+    if (range) {
+      ["rMin", "rMax"].forEach((id) => { $(id).min = range[0]; $(id).max = range[1]; $(id).step = (range[1] - range[0]) / 200; });
+    }
+    $("predictMethod").placeholder = info ? "default: " + info.predict_method : "default";
+  }
+
+  function applyConfig(cfg, qmDefault) {
     state.base = JSON.parse(JSON.stringify(cfg));
     const set = (id, v) => { $(id).value = v == null ? "" : v; };
     if ([...$("targetSel").options].some((o) => o.value === cfg.target.name)) $("targetSel").value = cfg.target.name;
+    $("predictMethod").value = (cfg.predict && cfg.predict.method) || "";
+    updateTargetUnits();
     set("minIn", cfg.target.min); set("maxIn", cfg.target.max);
     set("marginIn", cfg.screening.margin);
     const gen = cfg.generation;
     set("nCand", gen.defaults.n_candidates); $("nCand").max = gen.max_candidates;
     set("mStrength", gen.defaults.mutation_strength); $("mStrength").max = gen.max_mutation_strength;
     set("nXtb", cfg.predict.n_xtb); set("minEx", cfg.train.min_examples); set("rngSeed", cfg.rng_seed);
-    $("qmOn").checked = !!cfg.qm.enabled;
+    // QM validation is on by default (when the server has ORCA); a loaded config keeps its own choice.
+    $("qmOn").checked = qmDefault ? orcaAvailable() || !state.connected : !!cfg.qm.enabled;
     set("qmFunctional", cfg.qm.functional); set("qmBasis", cfg.qm.basis);
     if ([...$("qmBackend").options].some((o) => o.value === cfg.qm.backend)) $("qmBackend").value = cfg.qm.backend;
     set("maxRounds", cfg.budget.max_rounds); set("maxQm", cfg.budget.max_qm_calls);
@@ -84,7 +132,7 @@
         `<option value="${esc(p.name)}">${esc(p.name)}${p.supported ? "" : " (not supported yet)"}</option>`).join("");
       state.presets.forEach((p, i) => { $("presetSel").options[i].disabled = !p.supported; });
       const first = state.presets.find((p) => p.supported);
-      if (first && !state.base) { $("presetSel").value = first.name; applyConfig(first.config); }
+      if (first && !state.base) { $("presetSel").value = first.name; applyConfig(first.config, true); }
     }
     renderReadiness();
     updateQmFields();
@@ -111,8 +159,8 @@
     const t = state.system.tools;
     const chip = (ok, label, title) => `<span class="chip ${ok ? "good" : "bad"}" title="${esc(title)}">${ok ? "✓" : "✕"} ${label}</span>`;
     box.innerHTML =
-      chip(t.xtb.found, "xTB", t.xtb.path || "xtb not found: set XTB_BIN on the server") +
-      chip(t.orca.found, "ORCA", t.orca.path || "ORCA not found: QM validation unavailable") +
+      chip(t.xtb.found, "xTB" + (t.xtb.via === "orca" ? " (via ORCA)" : ""), t.xtb.note) +
+      chip(t.orca.found, "ORCA", t.orca.path || "ORCA not found: QM validation and ORCA-only targets unavailable") +
       chip(t.anthropic_key.set, "LLM key", t.anthropic_key.set ? "ANTHROPIC_API_KEY is set" : "No ANTHROPIC_API_KEY: rules only") +
       '<span class="note" style="margin-left:4px">Found ≠ tested: a program can be present but still fail to run.</span>';
   }
@@ -120,8 +168,8 @@
   // ------------------------------------------------------------------ target window
   function syncRangeFromInputs() {
     const lo = num("minIn"), hi = num("maxIn");
-    $("rMin").value = lo == null ? 0 : lo;
-    $("rMax").value = hi == null ? 10 : hi;
+    $("rMin").value = lo == null ? $("rMin").min : lo;
+    $("rMax").value = hi == null ? $("rMax").max : hi;
     drawRangeFill();
   }
   function syncInputsFromRange() {
@@ -132,13 +180,15 @@
     validateSoon();
   }
   function drawRangeFill() {
-    const lo = Math.max(0, Math.min(10, Number($("rMin").value)));
-    const hi = Math.max(0, Math.min(10, Number($("rMax").value)));
-    $("rangeFill").style.left = (Math.min(lo, hi) * 10) + "%";
-    $("rangeFill").style.width = (Math.abs(hi - lo) * 10) + "%";
+    const a = Number($("rMin").min), b = Number($("rMin").max), span = (b - a) || 1;
+    const pos = (v) => (Math.max(a, Math.min(b, Number(v))) - a) / span * 100;
+    const lo = pos($("rMin").value), hi = pos($("rMax").value);
+    $("rangeFill").style.left = Math.min(lo, hi) + "%";
+    $("rangeFill").style.width = Math.abs(hi - lo) + "%";
+    const level = state.connected ? predictLabel(buildConfig()) : "PREDICT";
     $("levelNote").textContent = $("qmOn").checked
-      ? "A molecule is curated only when its QM value is inside this window."
-      : "QM is off: molecules are curated on their xTB value (or ML estimate) inside this window.";
+      ? `A molecule is curated only when its QM value is inside this window. PREDICT (${level}) only screens.`
+      : `QM is off: molecules are curated on their PREDICT value (${level}) or ML estimate inside this window.`;
   }
 
   // ------------------------------------------------------------------ seed
@@ -155,7 +205,7 @@
       $("seedDepict").innerHTML = ""; viewer.clear("viewer3d", "3D preview appears here");
       state.seed.checking = false; validateSoon(); return;
     }
-    const quick = chem.parse(text);
+    const quick = chem.hasOCL() ? chem.parse(text) : { ok: true };   // libraries still loading: let the server check
     $("seedDepict").innerHTML = quick.ok ? chem.depictSVG(text, 220, 130) : "";
     if (editor && !syncingEditor && quick.ok && $("paneSmiles").hidden === false) {
       try { syncingEditor = true; editor.setSmiles(text); } catch (e) { /* ignore */ } finally { syncingEditor = false; }
@@ -227,13 +277,13 @@
   // ------------------------------------------------------------------ QM and decisions
   function updateQmFields() {
     const available = orcaAvailable();
-    $("qmOn").disabled = !available && !$("qmOn").checked;
+    $("qmOn").disabled = state.connected && !available && !$("qmOn").checked;
     const on = $("qmOn").checked;
     $("qmFields").classList.toggle("disabled", !on);
     ["qmBackend", "qmFunctional", "qmBasis", "maxQm"].forEach((id) => { $(id).disabled = !on; });
     $("qmNote").textContent = !state.connected ? ""
-      : !available ? "ORCA was not found on the server, so QM validation is unavailable. Runs curate on xTB/ML values."
-      : on ? "QM runs one DFT single point per selected molecule, on the xTB-stage geometry. It is the slow step."
+      : !available ? "ORCA was not found on the server, so QM validation is unavailable. Runs curate on PREDICT/ML values."
+      : on ? "QM runs one DFT calculation per selected molecule, on the geometry PREDICT used. It is the slow step."
       : "Off: no QM calculations. Turn on to confirm hits at the DFT level.";
     drawRangeFill();
   }
@@ -250,7 +300,7 @@
   async function validateNow() {
     const box = $("checks");
     if (!state.connected) {
-      box.innerHTML = '<div class="problem">Not connected to a server. Open Settings to connect.</div>';
+      box.innerHTML = '<div class="problem">Not connected to a server. Click the connection status at the top to connect.</div>';
       $("startBtn").disabled = true; return;
     }
     if (!state.base) return;
@@ -258,7 +308,7 @@
       const r = await api.validate(buildConfig());
       state.check = r;
       const seedNotes = state.seed.problems.length && state.seed.canonical
-        ? ["Seed: " + state.seed.problems.join(" ") + " Its children will likely fail in xTB."] : [];
+        ? ["Seed: " + state.seed.problems.join(" ") + " Its children will likely fail in PREDICT."] : [];
       const preset = state.presets.find((p) => p.name === $("presetSel").value);
       const presetNotes = preset && preset.config.seeds[0] === buildConfig().seeds[0] ? preset.notes : [];
       box.innerHTML =
@@ -291,8 +341,10 @@
   function bind() {
     $("presetSel").addEventListener("change", () => {
       const p = state.presets.find((x) => x.name === $("presetSel").value);
-      if (p) applyConfig(p.config);
+      if (p) applyConfig(p.config, true);
     });
+    $("targetSel").addEventListener("change", () => { updateTargetUnits(); syncRangeFromInputs(); });
+    $("predictMethod").addEventListener("input", () => { drawRangeFill(); validateSoon(); });
     ["rMin", "rMax"].forEach((id) => $(id).addEventListener("input", syncInputsFromRange));
     ["minIn", "maxIn"].forEach((id) => $(id).addEventListener("input", () => { syncRangeFromInputs(); validateSoon(); }));
     ["targetSel", "marginIn", "nCand", "mStrength", "nXtb", "minEx", "rngSeed", "qmBackend", "qmFunctional",
@@ -314,6 +366,12 @@
     init: function (onStarted) { state.onStarted = onStarted; bind(); renderReadiness(); validateNow(); },
     setConnected: setConnected,
     recheckSeed: checkSeed,
+    load: function (config) { applyConfig(config, false); validateSoon(); },   // e.g. a proposal from the agent view
+    librariesReady: function () {           // redraw what needed OpenChemLib / 3Dmol
+      $("editorFallback").style.display = "";
+      if (!$("paneDraw").hidden) initEditor();
+      checkSeed();
+    },
     useSeed: function (smiles) { $("smilesIn").value = smiles; selectSeedTab("smiles"); checkSeed();
       document.getElementById("formPanel").scrollIntoView({ behavior: "smooth" }); }
   };
