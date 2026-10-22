@@ -82,7 +82,7 @@ At the end it lists anything it could not do automatically.
 
 - **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
 - **Ollama** (optional, for a local model): https://ollama.com/download.
-- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package). QM is off by default, so ORCA is only needed when the run config has a `qm:` section.
+- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. ORCA is the only QM backend implemented so far (a PySCF backend is planned). QM is off by default, so ORCA is only needed when the run config has a `qm:` section.
 - **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
 
 ### Choosing the LLM
@@ -226,13 +226,17 @@ minutes) and its results: round stats, `dataset.csv`, the summary and the curate
 src/molcurator/
 ├── tools/       GENERATE, PREDICT, TRAIN, VALIDATE, CURATE, EVALUATE (one module each)
 ├── agent/       LangGraph graph, agent state, LLM client, prompts
-├── chem/        shared helpers: SMILES/SELFIES conversion, 3D geometry, XYZ I/O
+├── chem/        shared chemistry: SMILES/SELFIES, STONED, conformers, xTB/ORCA runs and their tracking
+├── batch/       `molcurator-properties`: xTB/ORCA on a CSV of molecules, reports, SLURM jobs
 ├── schemas.py   shared data models (Candidate, PropertyValue, CuratedEntry)
 └── cli.py       `molcurator` command
-configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml)
+configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml), plus chemistry/SLURM examples
 data/seeds/      seed molecules
+data/properties/ shared xTB/ORCA property dataset (PROPERTY_DATA.md)
 data/runs/       per-run outputs (gitignored)
-tests/           tool tests, plus tests/agent/ for the agent
+docs/chemistry/  PREDICT/VALIDATE, chemistry settings and batch/SLURM guides
+research/        study results, e.g. the local xTB validation report
+tests/           tool tests, plus tests/agent/ for the agent and tests/chemistry/ for xTB/ORCA
 notebooks/       exploration and demo plots
 scripts/         helper scripts
 demo/            presentation and video assets

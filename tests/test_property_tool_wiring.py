@@ -5,8 +5,8 @@ from molcurator.schemas import Candidate, PropertyTarget, QMSettings, Status
 
 public_predict=importlib.import_module('molcurator.tools.predict')
 public_validate=importlib.import_module('molcurator.tools.validate')
-xtb=importlib.import_module('molcurator_property_validation.tools.predict')
-orca=importlib.import_module('molcurator_property_validation.tools.validate')
+xtb=importlib.import_module('molcurator.tools.predict')
+orca=importlib.import_module('molcurator.tools.validate')
 TARGET=PropertyTarget(name='homo_lumo_gap',min=3,max=4)
 XYZ='2\nfixture\nH 0 0 0\nH 0 0 .74\n'
 REPORT=dict(force_field='MMFF94',selected_ff_energy_kcal_mol=0.,selected_ff_boltzmann_weight=1.,temperature_k=298.15,n_unique=1)

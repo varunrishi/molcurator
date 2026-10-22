@@ -1,0 +1,30 @@
+{
+  "rows": 336,
+  "datasets": {
+    "b3lyp_validation60": 60,
+    "historical_pbe0_276": 276
+  },
+  "methods": {
+    "dft:B3LYP/def2-SVP": 60,
+    "dft:PBE0/def2-SVP": 276
+  },
+  "statuses": {
+    "ok": 60,
+    "": 276
+  },
+  "sha256": "fe88e1637136e0b9557caf09fbdee38484e7c4942a4aca176e8e32870d364512",
+  "source_repository": "aelm-nv/molcurator",
+  "source_commit": "61f91ec719a5dbe416cada0a9941e578e52ffe6c",
+  "source_path": "data/properties/molcurator_properties_for_collaborators.csv",
+  "row_identity": [
+    "dataset",
+    "candidate_id"
+  ],
+  "units": {
+    "orbital_energies_and_gaps": "eV",
+    "dipole_magnitude": "Debye",
+    "ff_energy": "kcal/mol",
+    "temperature": "K"
+  },
+  "missing_values": "blank fields are unavailable observations, not zero"
+}

@@ -5,8 +5,8 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "subprojects/property_validation_v1/src"))
-from molcurator_property_validation.chem.summary import summarize
+sys.path.insert(0, str(ROOT / "src"))
+from molcurator.chem.summary import summarize
 
 
 def main():
