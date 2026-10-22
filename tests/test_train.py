@@ -14,7 +14,8 @@ def test_train_then_ml_predict_keeps_the_contract(tmp_path):
                 for s, m in zip(smiles, mols)]  # a simple, learnable "gap"
     target = load_config(CONFIG).target
     model = train(examples, target, tmp_path / "round-1")
-    assert model.model_path.is_file() and 1 <= model.n_examples <= 80 and {"test_mae", "go"} <= set(model.metrics)
+    assert model.model_path.is_file() and {"test_mae", "go"} <= set(model.metrics)
+    assert model.n_examples == 80 == sum(model.metrics[k] for k in ("n_train", "n_test", "n_pool"))  # all given
     assert model.metrics["test_mae"] < model.metrics["baseline_mae"]  # it learned something
     candidates = [Candidate(id=f"c{i}", smiles=s, parent_smiles="C", round=2, generator="stoned_selfies")
                   for i, s in enumerate(["CCCCCO", "[se]1cccc1", "c1ccccc1CCC"])]
