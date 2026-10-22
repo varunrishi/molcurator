@@ -29,7 +29,7 @@ def test_orca_path_is_checked_without_launch(tmp_path, monkeypatch):
     monkeypatch.setenv("ORCA_BIN", str(exe))
     report = check.preflight("all", tmp_path / "absent.env")
     assert report["ok"] and not report["runtime_tested"]
-    assert {c["name"] for c in report["checks"]} >= {"tblite", "opi", "ORCA_BIN"}
+    assert {c["name"] for c in report["checks"]} >= {"xTB engine", "opi", "ORCA_BIN"}
 
 
 def test_xtb_only_preflight_needs_no_orca(tmp_path, monkeypatch):
@@ -73,3 +73,17 @@ def test_runtime_smoke_failure_returns_nonzero(tmp_path, monkeypatch, capsys):
     assert check.main() == 1
     report = json.loads(capsys.readouterr().out)
     assert report["runtime_tested"] and not report["ok"]
+
+
+def test_missing_tblite_falls_back_to_orca_or_fails(tmp_path, monkeypatch):
+    from molcurator.chem import backends
+    monkeypatch.setattr(backends, "tblite_error", lambda: "ModuleNotFoundError: No module named 'tblite'")
+    monkeypatch.setenv("ORCA_BIN", str(tmp_path / "missing"))
+    check_xtb = next(c for c in check.preflight("xtb", tmp_path / "absent.env")["checks"] if c["name"] == "xTB engine")
+    assert not check_xtb["ok"] and "no ORCA" in check_xtb["detail"]
+    exe = tmp_path / "fake-orca"
+    exe.write_text("fixture")
+    exe.chmod(0o755)
+    monkeypatch.setenv("ORCA_BIN", str(exe))
+    check_xtb = next(c for c in check.preflight("xtb", tmp_path / "absent.env")["checks"] if c["name"] == "xTB engine")
+    assert check_xtb["ok"] and "built-in xTB" in check_xtb["detail"]

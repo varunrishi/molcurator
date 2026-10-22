@@ -230,7 +230,12 @@ property name and a level of theory, and return a JSON-ready dict (`success`, `v
   ionisation potentials and electron affinities.
 - `molcurator.chem.xtb.calculate_property`: GFN2-, GFN1- and IPEA1-xTB through tblite, in-process.
   Energies, gradients, optimisation, frequencies, HOMO-LUMO gap, dipole, quadrupole, charges, bond
-  orders, IP/EA, with optional ALPB solvation. xTB has no excited states.
+  orders, IP/EA, with optional ALPB solvation. xTB has no excited states. Where tblite is not
+  installed (it is left out on Windows, which has no tblite wheels), GFN2-/GFN1-xTB fall back to
+  ORCA's built-in xTB (same numbers; the result's notes say so).
+
+VALIDATE refuses xTB methods (`qm.functional: gfn2-xtb` is rejected when the config is loaded):
+it has to be a higher level of theory than PREDICT, which runs GFN2-xTB wherever xTB can give the target.
 
 `molcurator-properties` runs the same PREDICT (and optionally VALIDATE) over a CSV or SMILES file,
 outside the agent loop:

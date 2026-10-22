@@ -40,6 +40,9 @@ def run_batch(args, *, predict_fn, validate_fn) -> int:
     settings = load_settings()
     target = _target(args)
     qm = QMSettings(backend="orca", functional=args.functional, basis=args.basis)
+    from molcurator.chem.backends import xtb_validation_message
+    if args.orca and (warning := xtb_validation_message(args.functional)):
+        raise ValueError(warning.replace("qm.functional", "--functional"))
     if args.orca_limit is not None and not args.orca:
         raise ValueError("--orca-limit requires --orca")
     if args.orca_limit is not None and args.orca_limit < 0:

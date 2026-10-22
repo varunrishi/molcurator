@@ -75,6 +75,7 @@ Tool-specific obligations:
 - **VALIDATE** (done, ORCA driven from Python by OPI / `orca-pi`; PySCF not implemented): starts
   from each molecule's PREDICT geometry, and names the level of theory in `method`
   (e.g. `"dft:B3LYP/def2-SVP"`). New target properties go in `chem/orca.py` / `chem/xtb.py`.
+  xTB methods are refused in VALIDATE, which must be above PREDICT's level of theory.
 - **CURATE:** must be **idempotent**: an entry whose id or SMILES is already in the dataset is
   skipped, so re-running after an interrupted run never adds a molecule twice.
 

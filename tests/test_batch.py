@@ -75,6 +75,12 @@ def test_property_and_methods_reach_the_tools(tmp_path, source, tools):
     assert cli.main(["run", str(source), "--out", str(tmp_path / "r2"), "--property", "frequencies"]) == 2
 
 
+def test_xtb_validation_method_is_refused_before_execution(tmp_path, source, tools, capsys):
+    args = ["run", str(source), "--out", str(tmp_path / "run"), "--orca", "--functional", "gfn2-xtb"]
+    assert cli.main(args) == 2
+    assert tools == [] and "--functional is 'gfn2-xtb'" in capsys.readouterr().err
+
+
 def test_changed_resume_input_is_rejected(tmp_path, source, tools):
     args = ["run", str(source), "--out", str(tmp_path / "run"), "--no-plots"]
     cli.main(args)

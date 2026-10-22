@@ -73,6 +73,14 @@ class QMConfig(QMSettings):
     # section but skips QM. With no qm: section, RunConfig's default below has QM off (R11.1).
     enabled: bool = True
 
+    @model_validator(mode="after")
+    def _not_xtb(self) -> "QMConfig":
+        # VALIDATE checks PREDICT (GFN2-xTB by default), so an xTB method here would validate xTB with xTB.
+        from molcurator.chem.backends import xtb_validation_message
+        if self.enabled and (warning := xtb_validation_message(self.functional)):
+            raise ValueError(warning)
+        return self
+
 
 class RunConfig(StrictModel):
     """One run: what to look for, where to start, and the limits (configs/<use case>.yaml)."""

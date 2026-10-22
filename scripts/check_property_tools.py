@@ -1,6 +1,7 @@
 """Check Python imports and chemistry backends; optional real one-molecule smoke test.
 
-xTB runs in-process through tblite (a Python package), so it needs no binary. ORCA is
+xTB runs in-process through tblite (a Python package), so it needs no binary; without tblite
+it falls back to ORCA's built-in xTB (GFN2/GFN1). ORCA is
 found through ORCA_BIN (environment or .env), else `orca` on PATH. ORCA on more than one core
 (orca_nprocs > 1) also needs Open MPI: OPENMPI_HOME, else mpirun on PATH.
 """
@@ -18,7 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 MODULES = ("rdkit", "pydantic", "yaml", "molcurator.tools.predict", "molcurator.tools.validate",
            "molcurator.batch.cli")
-BACKEND_MODULES = {"xtb": ("tblite", "tblite.interface"), "orca": ("opi",)}
+BACKEND_MODULES = {"xtb": (), "orca": ("opi",)}  # xTB: see _xtb_check
 
 
 def _env(env_file: Path) -> None:
@@ -38,6 +39,17 @@ def _orca_check() -> dict:
     detail = (f"{executable} (runtime not tested)" if ok else
               f"Not executable or not found: {value}. Set ORCA_BIN to an absolute executable path or load its module.")
     return {"name": "ORCA_BIN", "ok": ok, "detail": detail}
+
+
+def _xtb_check() -> dict:
+    """tblite, else the fallback: GFN2/GFN1-xTB through ORCA's built-in xTB."""
+    from molcurator.chem.backends import tblite_error
+    if (error := tblite_error()) is None:
+        return {"name": "xTB engine", "ok": True, "detail": "tblite (in-process)"}
+    orca = _orca_check()
+    detail = (f"tblite unavailable ({error}); GFN2/GFN1-xTB will run through ORCA's built-in xTB"
+              if orca["ok"] else f"tblite unavailable ({error}) and no ORCA to fall back on: {orca['detail']}")
+    return {"name": "xTB engine", "ok": orca["ok"], "detail": detail}
 
 
 def _mpi_check(nprocs: int) -> dict:
@@ -70,6 +82,8 @@ def preflight(backend: str = "all", env_file: Path | None = None) -> dict:
         checks.append({"name": "chemistry settings", "ok": True, "detail": settings.model_dump()})
     except Exception as exc:  # noqa: BLE001 - reported as a failed check
         checks.append({"name": "chemistry settings", "ok": False, "detail": str(exc)})
+    if "xtb" in backends:
+        checks.append(_xtb_check())
     if "orca" in backends:
         checks.append(_orca_check())
         checks.append(_mpi_check(nprocs))

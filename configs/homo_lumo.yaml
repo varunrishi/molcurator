@@ -9,6 +9,7 @@ seeds:
 screening:
   margin: 0.2  # xTB screen accepts 2.8-3.7 eV (xTB is systematically offset from QM)
 # Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.
+# The functional must be DFT (or HF), not xTB: PREDICT already uses GFN2-xTB here.
 # qm:
 #   backend: orca
 #   functional: B3LYP

@@ -3,11 +3,16 @@
 # Backend: ORCA through OPI (chem/orca.py); the binary is ORCA_BIN, else `orca` on PATH.
 #          PySCF remains unimplemented.
 # Any property chem/orca.py knows can be the target: DFT for HOMO/LUMO gaps, TD-DFT for the
-# S1-T1 gap, and so on, at qm.functional / qm.basis with TightSCF.
+# S1-T1 gap, and so on, at qm.functional / qm.basis with TightSCF. xTB methods are refused
+# with a warning (see chem/backends.py: xtb_validation_message): VALIDATE must sit above PREDICT.
 # Input geometries come from PREDICT (MMFF94-optimised); their XYZ comment line carries
 # charge and multiplicity. Records go to <xyz dir>/calculations/<id>/validate.json.
 # Output: one QMResult (schemas.py) per molecule, with method naming the level of theory.
-from molcurator.chem.backends import calculate_property, method_label
+from molcurator.chem.backends import (
+    calculate_property,
+    method_label,
+    xtb_validation_message,
+)
 from molcurator.chem.geometry import read_charge_multiplicity, read_xyz
 from molcurator.chem.settings import load_settings
 from molcurator.fileio import atomic_json, safe_id
@@ -16,6 +21,8 @@ from molcurator.schemas import Prediction, PropertyTarget, QMResult, QMSettings,
 
 def _validate_one(item: Prediction, target: PropertyTarget, qm: QMSettings) -> QMResult:
     method = f"dft:{qm.functional}/{qm.basis}"
+    if warning := xtb_validation_message(qm.functional):  # no calculation: xTB cannot validate xTB
+        return QMResult(candidate_id=item.candidate_id, method=method, status=Status.failed, error=warning)
     if qm.backend != "orca":
         raise ValueError(f"QM backend {qm.backend!r} is not implemented; use orca")
     if item.status is not Status.ok or item.xyz_path is None:

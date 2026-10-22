@@ -2,7 +2,8 @@
 # Full setup (Python deps + LLM): scripts/setup.sh
 # Python deps only, with uv:  uv sync
 #                  with pip:  pip install -e .
-# xTB runs in-process through tblite (a pip package). ORCA is not on PyPI: install it
+# xTB runs in-process through tblite (a pip package; not installed on Windows, where xTB
+# runs through ORCA's built-in xTB instead). ORCA is not on PyPI: install it
 # yourself (free academic licence) and set ORCA_BIN or put `orca` on PATH (see README).
 
 [build-system]
@@ -43,7 +44,7 @@ dependencies = [
     "typer>=0.12",
     "python-dotenv>=1.0",      # loads settings (ORCA_BIN, LLM_*) from .env
     "orca-pi>=2.0 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
-    "tblite>=0.7",
+    "tblite>=0.7 ; sys_platform != 'win32'",  # no Windows wheels: xTB falls back to ORCA there
 ]
 
 [project.optional-dependencies]
