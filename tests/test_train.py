@@ -89,3 +89,12 @@ def test_refit_on_all_is_optional_and_fits_the_saved_model_on_every_example(tmp_
     assert refit.n_examples == plain.n_examples == 80
     card = json.loads((tmp_path / "refit" / "report_card.json").read_text())
     assert card["final_fit"] == {"refit_on_all": True, "n": 80}
+
+
+def test_train_model_option_defaults_to_catboost():
+    """train.model: CatBoost unless the config names the random forest; anything else is rejected."""
+    from molcurator.config import TrainSettings
+    assert TrainSettings().model == "catboost" and train_with(False, "catboost") is train
+    assert train_with(False, "random_forest") is not train
+    with pytest.raises(ValueError):
+        TrainSettings(model="xgboost")

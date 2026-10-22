@@ -33,7 +33,8 @@ dependencies = [
     "rdkit<2026; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     # Data, config, CLI
     "pandas>=2.0",
-    "scikit-learn>=1.3",  # TRAIN: random forest (tools/train.py)
+    "scikit-learn>=1.3",  # TRAIN: random forest (tools/train.py), splits and metrics
+    "catboost>=1.2",      # TRAIN: CatBoost, the default model (train.model)
     "joblib>=1.3",        # TRAIN: saves and loads the model bundle
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -48,8 +49,6 @@ dependencies = [
 
 [project.optional-dependencies]
 reports = ["matplotlib>=3.8"]
-# CatBoost training (tools/traincatboost.py), an alternative to the random forest; the agent does not use it yet.
-catboost = ["catboost>=1.2"]
 # Mol2Mol (REINVENT4) backend for GENERATE; REINVENT4 is installed from its git repo,
 # so it is kept optional while STONED SELFIES is the default generator.
 # reinvent = []

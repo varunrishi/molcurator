@@ -98,6 +98,8 @@ class TrainSettings(StrictModel):
     # Off: the saved model is the one fitted on the training split, as measured. On: after measuring it, the
     # saved model is refitted on every xTB value, so held-out ring systems reach ML PREDICT too.
     refit_on_all: bool = False
+    # TRAIN's model: CatBoost by default; the random forest is kept for comparison.
+    model: Literal["catboost", "random_forest"] = "catboost"
 
 
 class QMConfig(QMSettings):

@@ -16,12 +16,13 @@ class Toolset:
     def default(cls, predict_settings=None, train_settings=None) -> "Toolset":
         """The real tools. Imported here, so code that only uses fakes never loads their dependencies.
         predict_settings (the run config's predict: section) sets PREDICT's method and basis;
-        train_settings (its train: section) whether TRAIN refits the saved model on every example."""
+        train_settings (its train: section) TRAIN's model and whether it refits the saved model on every example."""
         from molcurator.tools import curate, generate, predict, train, validate
         method = predict_settings.method if predict_settings else None
         basis = predict_settings.basis if predict_settings else None
         refit = bool(train_settings and train_settings.refit_on_all)
-        return cls(generate.generate, predict.predict_at(method, basis), train.train_with(refit), train.ml_predict,
+        model = train_settings.model if train_settings else train.DEFAULT_MODEL
+        return cls(generate.generate, predict.predict_at(method, basis), train.train_with(refit, model), train.ml_predict,
                    validate.validate, curate.curate)
 
     @classmethod

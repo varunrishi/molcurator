@@ -78,7 +78,7 @@ from molcurator.tools.train import (
 # the model stops early (use_best_model=True).  The fast budget is for smoke
 # tests / CI; the full budget gives the early-stopper enough room to settle.
 _CB_ITERATIONS_FAST = 400
-_CB_ITERATIONS_FULL = 2000
+_CB_ITERATIONS_FULL = 500  # the agent's TRAIN fits ~8 models without early stopping; 2000 took ~30 s per TRAIN
 
 # Fraction of X_train held back as an internal CatBoost validation set for
 # early stopping.  It is carved out *before* the CV fold loop so the same
