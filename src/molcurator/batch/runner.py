@@ -1,41 +1,64 @@
-"""Checkpointed batch execution independent of command-line parsing."""
-from datetime import datetime, timezone
+"""Checkpointed batch execution, independent of command-line parsing.
+
+Each molecule is predicted, then (with --orca) validated if its predicted value lies in the
+selection window and the per-invocation limit is not reached. results.json is rewritten
+after every step, so an interrupted run resumes where it stopped (--resume).
+"""
 import hashlib
 import json
 import math
-from pathlib import Path
-import re
 import uuid
-from molcurator.schemas import PropertyTarget, QMSettings, Status
-from molcurator.tools.predict import predict
-from molcurator.tools.validate import validate
-from .inputs import read_candidates
-from .runtime import check_allocation, run_lock
+from datetime import UTC, datetime
+from pathlib import Path
+
+from molcurator.batch.inputs import read_candidates
+from molcurator.batch.runtime import check_allocation, run_lock
 from molcurator.chem.settings import active_settings, load_settings
-from molcurator.chem.fileio import atomic_json, native_path
+from molcurator.fileio import atomic_json, native_path
+from molcurator.schemas import PropertyTarget, QMSettings, Status
+
+SCHEMA_VERSION = 2
 
 
-def run_batch(args, *, predict_fn=None, validate_fn=None):
-    predict_fn = predict if predict_fn is None else predict_fn
-    validate_fn = validate if validate_fn is None else validate_fn
-    from .reporting import generate_report, require_plotting
+def _target(args) -> PropertyTarget:
+    """The target the tools receive. They read only its name; the window is applied here."""
+    from molcurator.chem.backends import check_target
+    try:
+        units = check_target(args.property, args.units)
+    except ValueError as exc:  # same check as a run config, named after this command's options
+        raise ValueError(str(exc).replace("target units", "--units").replace("target ", "--property ", 1)) from exc
+    if any(v is not None and not math.isfinite(v) for v in (args.min, args.max)):
+        raise ValueError("--min and --max must be finite")
+    if args.min is None and args.max is None:  # no window: every successful prediction is selected
+        return PropertyTarget(name=args.property, min=-math.inf, units=units)
+    return PropertyTarget(name=args.property, min=args.min, max=args.max, units=units)
+
+
+def run_batch(args, *, predict_fn, validate_fn) -> int:
+    from molcurator.batch.reporting import generate_report, require_plotting
     if args.plots:
         require_plotting()
     candidates = read_candidates(args.input, args.format)
     settings = load_settings()
-    check_allocation(settings, args.orca)
-    target = PropertyTarget(name="homo_lumo_gap", min=args.min_gap if args.min_gap is not None else 0,
-                            max=args.max_gap, units="eV")
+    target = _target(args)
     qm = QMSettings(backend="orca", functional=args.functional, basis=args.basis)
-    if any(value is not None and not math.isfinite(value) for value in (args.min_gap, args.max_gap)):
-        raise ValueError("gap bounds must be finite")
-    if args.orca and any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_+*(),./-]*", token)
-                         for token in (qm.functional, qm.basis)):
-        raise ValueError("functional and basis must be single ORCA keyword tokens")
+    from molcurator.chem.backends import xtb_validation_message
+    if args.orca and (warning := xtb_validation_message(args.functional)):
+        raise ValueError(warning.replace("qm.functional", "--functional"))
     if args.orca_limit is not None and not args.orca:
         raise ValueError("--orca-limit requires --orca")
     if args.orca_limit is not None and args.orca_limit < 0:
         raise ValueError("--orca-limit must be nonnegative")
+    from molcurator.chem.backends import backend_for
+    from molcurator.tools.predict import check_predict_level, default_method
+    qm_level = (args.functional, args.basis) if args.orca else (None, None)
+    try:
+        check_predict_level(target.name, args.predict_method, args.predict_basis, *qm_level)
+    except ValueError as exc:  # same check as a run config, named after this command's options
+        raise ValueError(str(exc).replace("predict.method", "--predict-method")
+                         .replace("predict.basis", "--predict-basis")) from exc
+    predict_method = args.predict_method or default_method(target)
+    check_allocation(settings, args.orca or backend_for(predict_method) == "orca")
     dataset = [candidate.model_dump(mode="json") for candidate in candidates]
     fingerprint = hashlib.sha256(json.dumps(dataset, sort_keys=True).encode()).hexdigest()
     output = native_path(args.out)
@@ -47,60 +70,62 @@ def run_batch(args, *, predict_fn=None, validate_fn=None):
     with run_lock(output):
         if args.resume:
             old = json.loads((output / "results.json").read_text())
-            if old.get("input_fingerprint") != fingerprint:
-                raise ValueError("resume input differs; use a new output directory")
+            if old.get("schema_version") != SCHEMA_VERSION or old.get("input_fingerprint") != fingerprint:
+                raise ValueError("resume input or results format differs; use a new output directory")
             history = output / "history"
             history.mkdir(exist_ok=True)
             atomic_json(history / (old["invocation_id"] + ".json"), old)
-        state = dict(schema_version=1, invocation_id=uuid.uuid4().hex,
-            input_path=str(Path(args.input).resolve()), input_fingerprint=fingerprint,
-            started_at=datetime.now(timezone.utc).isoformat(), run_status="running",
-            settings=settings.model_dump(), target=target.model_dump(mode="json"),
-            qm=qm.model_dump(mode="json") if args.orca else None, orca_limit=args.orca_limit,
-            rows=[dict(candidate=c, prediction=None, qm_result=None,
-                       orca_selection="pending" if args.orca else "not_requested") for c in dataset])
+        window = {"min": args.min, "max": args.max}
+        state = {"schema_version": SCHEMA_VERSION, "invocation_id": uuid.uuid4().hex,
+                 "input_path": str(Path(args.input).resolve()), "input_fingerprint": fingerprint,
+                 "started_at": datetime.now(UTC).isoformat(), "run_status": "running",
+                 "settings": settings.model_dump(), "target": {"name": target.name, "units": target.units, **window},
+                 "predict_method": predict_method, "predict_basis": args.predict_basis, "qm": qm.model_dump(mode="json") if args.orca else None,
+                 "orca_limit": args.orca_limit,
+                 "rows": [{"candidate": c, "prediction": None, "qm_result": None,
+                           "qm_selection": "pending" if args.orca else "not_requested"} for c in dataset]}
 
         def checkpoint():
             atomic_json(output / "results.json", state)
 
         checkpoint()
-        selected_count = 0
+        selected = 0
         exit_code = 0
-        token = active_settings.set(settings)
+        token = active_settings.set(settings)  # one frozen copy for the whole invocation
         try:
-            for candidate, row in zip(candidates, state["rows"]):
-                prediction = predict_fn([candidate], target, output / "xyz")[0]
+            for candidate, row in zip(candidates, state["rows"], strict=True):
+                prediction = predict_fn([candidate], target, output / "xyz", predict_method, args.predict_basis)[0]
                 row["prediction"] = prediction.model_dump(mode="json")
                 checkpoint()
                 if prediction.status is Status.failed:
                     exit_code = 1
                     if args.orca:
-                        row["orca_selection"] = "prediction_failed"
+                        row["qm_selection"] = "prediction_failed"
                 elif args.orca:
-                    in_window = (target.min is None or prediction.value >= target.min) and (
-                        target.max is None or prediction.value <= target.max)
-                    within_limit = args.orca_limit is None or selected_count < args.orca_limit
+                    in_window = ((args.min is None or prediction.value >= args.min)
+                                 and (args.max is None or prediction.value <= args.max))
+                    within_limit = args.orca_limit is None or selected < args.orca_limit
                     if in_window and within_limit:
-                        selected_count += 1
-                        row["orca_selection"] = "selected"
+                        selected += 1
+                        row["qm_selection"] = "selected"
                         checkpoint()
                         result = validate_fn([prediction], target, qm)[0]
                         row["qm_result"] = result.model_dump(mode="json")
                         if result.status is Status.failed:
                             exit_code = 1
                     else:
-                        row["orca_selection"] = "outside_window" if not in_window else "limit_reached"
+                        row["qm_selection"] = "outside_window" if not in_window else "limit_reached"
                 checkpoint()
             state["run_status"] = "completed_with_failures" if exit_code else "completed"
         except KeyboardInterrupt:
             state["run_status"] = "interrupted"
             exit_code = 130
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - recorded in results.json and the report
             state.update(run_status="error", error=f"{type(exc).__name__}: {exc}")
             exit_code = 1
         finally:
             active_settings.reset(token)
-            state["finished_at"] = datetime.now(timezone.utc).isoformat()
+            state["finished_at"] = datetime.now(UTC).isoformat()
             checkpoint()
             generate_report(output, plots=args.plots)
         print(f"{state['run_status']}: {output / 'report.md'}")

@@ -76,3 +76,16 @@ def test_correction_is_rejected_for_other_properties():
     tadf["predict"]["correction"] = load_config(CONFIG).predict.correction.model_dump()
     with pytest.raises(ValueError, match="applies to homo_lumo_gap only, not 's1_t1_gap'"):
         RunConfig.model_validate(tadf)
+
+
+@pytest.mark.parametrize("method,ok", [(None, True), ("gfn2-xtb", True), ("GFN2-xTB", True), ("gfn1-xtb", False),
+                                       ("B97-3c", False)])
+def test_correction_needs_gfn2_xtb_predict(method, ok):
+    """The correction is fitted on GFN2-xTB gaps, so another PREDICT method (predict.method) is refused with it."""
+    data = load_config(CONFIG).model_dump()
+    data["predict"]["method"] = method
+    if ok:
+        assert RunConfig.model_validate(data).predict.correction is not None
+    else:
+        with pytest.raises(ValueError, match="fitted for GFN2-xTB"):
+            RunConfig.model_validate(data)

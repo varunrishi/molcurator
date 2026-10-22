@@ -1,27 +1,27 @@
-"""Read calculation attempts, cache hits and runtimes for a run directory."""
+"""Count the recorded calculations, failures and runtime of a run's xyz/ directory (an agent
+run's data/runs/<id>/xyz or a batch run's <out>/xyz)."""
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from molcurator.chem.summary import summarize
+from molcurator.batch.reporting import summarize
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_dir", type=Path)
+    parser.add_argument("xyz_dir", type=Path)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    if not args.run_dir.is_dir():
-        parser.error("run directory does not exist")
-    report = summarize(args.run_dir)
+    if not args.xyz_dir.is_dir():
+        parser.error("directory does not exist")
+    report = summarize(args.xyz_dir)
     if args.json:
         print(json.dumps(report, indent=2))
     else:
-        for key in ("events", "cache_hits", "electronic_calls_attempted", "by_backend",
-                    "failed_events", "running_or_interrupted", "runtime_s", "record_errors"):
+        for key in ("calculations", "by_backend", "failed", "runtime_s", "record_errors"):
             print(f"{key}: {report[key]}")
     return 1 if report["record_errors"] else 0
 

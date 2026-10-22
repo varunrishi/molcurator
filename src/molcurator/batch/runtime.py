@@ -1,11 +1,11 @@
 """Run-directory locking and scheduler allocation checks."""
-from contextlib import contextmanager
 import os
+from contextlib import contextmanager
 
 
 @contextmanager
 def run_lock(directory):
-    """OS advisory lock releases after interruption without stale lock removal."""
+    """OS advisory lock, released on interruption, so no stale lock file needs removing."""
     handle = (directory / ".run.lock").open("a+b")
     locked = False
     try:
@@ -13,7 +13,8 @@ def run_lock(directory):
             import msvcrt
             handle.seek(0, 2)
             if handle.tell() == 0:
-                handle.write(b"0"); handle.flush()
+                handle.write(b"0")
+                handle.flush()
             handle.seek(0)
             try:
                 msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -34,8 +35,9 @@ def run_lock(directory):
         handle.close()
 
 
-def check_allocation(settings, orca):
-    if not orca:
+def check_allocation(settings, uses_orca: bool) -> None:
+    """Refuse ORCA settings larger than the SLURM allocation before any calculation starts."""
+    if not uses_orca:
         return
     cpus = os.environ.get("SLURM_CPUS_PER_TASK")
     if cpus and settings.orca_nprocs > int(cpus):

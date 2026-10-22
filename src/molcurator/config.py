@@ -3,7 +3,14 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from rdkit import Chem
 
 from molcurator.schemas import GenerationSettings, PropertyTarget, QMSettings
@@ -73,7 +80,13 @@ class CorrectionSettings(StrictModel):
 
 
 class PredictSettings(StrictModel):
-    n_xtb: int = Field(default=200, ge=1)  # xTB on a random sample of this many new candidates per round (R10.1)
+    # PREDICT on a random sample of this many new candidates per round (R10.1). The name predates
+    # TD-DFT PREDICT: targets xTB cannot give (s1_t1_gap) run B97-3c instead, see tools/predict.py.
+    n_xtb: int = Field(default=200, ge=1)
+    # PREDICT's level of theory. None: GFN2-xTB when xTB can give the target, else B97-3c.
+    # Any ORCA method or xTB name (gfn2-xtb, gfn1-xtb); basis only for methods without their own.
+    method: str | None = None
+    basis: str | None = None
     correction: CorrectionSettings | None = None  # none: PREDICT keeps the raw xTB values
 
 
@@ -92,6 +105,14 @@ class QMConfig(QMSettings):
     # section but skips QM. With no qm: section, RunConfig's default below has QM off (R11.1).
     enabled: bool = True
 
+    @model_validator(mode="after")
+    def _not_xtb(self) -> "QMConfig":
+        # VALIDATE checks PREDICT (GFN2-xTB by default), so an xTB method here would validate xTB with xTB.
+        from molcurator.chem.backends import xtb_validation_message
+        if self.enabled and (warning := xtb_validation_message(self.functional)):
+            raise ValueError(warning)
+        return self
+
 
 class RunConfig(StrictModel):
     """One run: what to look for, where to start, and the limits (configs/<use case>.yaml)."""
@@ -107,6 +128,23 @@ class RunConfig(StrictModel):
     decisions: Literal["llm", "rules"] = "llm"  # "rules": no LLM calls at all (R9.4)
     llm: LLMSettings = LLMSettings()
     rng_seed: int = 0  # passed to generate, so a run is repeatable (R7.2)
+
+    @model_validator(mode="after")
+    def _target_is_a_property(self) -> "RunConfig":
+        # A target the tools cannot compute, or a window in the wrong unit, would only fail (or
+        # mislead) once PREDICT runs; checked here instead. Units left out take the property's own.
+        from molcurator.chem.backends import check_target
+        given = self.target.units if "units" in self.target.model_fields_set else None
+        self.target.units = check_target(self.target.name, given)
+        return self
+
+    @model_validator(mode="after")
+    def _predict_level_works(self) -> "RunConfig":
+        # Checked here, so an impossible PREDICT level stops the run before any calculation.
+        from molcurator.tools.predict import check_predict_level
+        qm = (self.qm.functional, self.qm.basis) if self.qm.enabled else (None, None)
+        check_predict_level(self.target.name, self.predict.method, self.predict.basis, *qm)
+        return self
 
     @field_validator("seeds")
     @classmethod
@@ -126,6 +164,11 @@ class RunConfig(StrictModel):
         if self.predict.correction is not None and self.target.name != CORRECTED_PROPERTY:
             raise ValueError(f"predict.correction applies to {CORRECTED_PROPERTY} only, not {self.target.name!r}; "
                              "remove it from this config")
+        # ...and it is fitted for GFN2-xTB gaps: another PREDICT method needs its own fit.
+        method = self.predict.method
+        if self.predict.correction is not None and method is not None and method.strip().lower() != "gfn2-xtb":
+            raise ValueError(f"predict.correction is fitted for GFN2-xTB, not predict.method {method!r}; "
+                             "remove the correction or fit one for this method (scripts/fit_xtb_correction.py)")
         return self
 
 

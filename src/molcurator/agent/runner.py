@@ -3,7 +3,7 @@ import secrets
 import sqlite3
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -19,7 +19,7 @@ from molcurator.config import RunConfig, load_config
 def create_run_dir(config: RunConfig, runs_root: str | Path = "data/runs", run_id: str | None = None) -> Path:
     """Make data/runs/<run_id>/ and save the validated config in it (R8.4); returns the folder.
     A new id is time-sortable with a random suffix; an existing folder is never overwritten."""
-    run_id = run_id or f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
+    run_id = run_id or f"{datetime.now(UTC):%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
     run_dir = Path(runs_root) / run_id
     run_dir.mkdir(parents=True, exist_ok=False)  # raises if that run exists: no accidental overwrite
     (run_dir / "config.yaml").write_text(yaml.safe_dump(config.model_dump(mode="json"), sort_keys=False))
@@ -38,7 +38,9 @@ def default_decider(config: RunConfig) -> Decider:
     """The decider for the config's mode; run_agent and resume_agent share it, so a resumed run
     decides exactly as the original would have (R9.4)."""
     if config.decisions == "llm":
-        from molcurator.agent.llm import make_llm_decider  # imported here: rules-mode runs never load the SDK
+        from molcurator.agent.llm import (
+            make_llm_decider,  # imported here: rules-mode runs never load the SDK
+        )
         return make_llm_decider(config)
     return RuleDecider()
 
@@ -54,7 +56,7 @@ def run_agent(config: RunConfig, tools: Toolset | None = None, decider: Decider 
     write_run_start(trace, config, nodes_for(config))
     saver = open_checkpointer(run_dir)
     try:  # the connection is closed even on Ctrl-C; every finished node's checkpoint is already saved
-        graph = build_graph(config, tools or Toolset.default(), decider, checkpointer=saver, trace=trace)
+        graph = build_graph(config, tools or Toolset.default(config.predict), decider, checkpointer=saver, trace=trace)
         steps = (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2  # every node per round, plus WRITE SUMMARY
         return graph.invoke(initial_state(run_dir.name, run_dir),
                             {"configurable": {"thread_id": run_dir.name}, "recursion_limit": steps})  # R7.1
@@ -72,7 +74,7 @@ def resume_agent(run_id: str, runs_root: str | Path = "data/runs", tools: Toolse
     saver = open_checkpointer(run_dir)
     try:
         trace = TraceWriter(run_dir, run_id, on_event)
-        graph = build_graph(config, tools or Toolset.default(), decider, checkpointer=saver, trace=trace)
+        graph = build_graph(config, tools or Toolset.default(config.predict), decider, checkpointer=saver, trace=trace)
         thread = {"configurable": {"thread_id": run_id}, "recursion_limit": (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2}
         saved = graph.get_state(thread)
         if not saved.next:  # finished (reached WRITE SUMMARY) or never checkpointed

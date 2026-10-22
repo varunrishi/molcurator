@@ -1,5 +1,5 @@
 {
-  "project_dir": "/home/USERNAME/molcurator-property-test",
+  "project_dir": "/home/USERNAME/molcurator",
   "input": "/home/USERNAME/generated_smiles.csv",
   "out": "/work/GROUP/molcurator/generated-001",
   "python": ".venv/bin/python",
@@ -9,8 +9,10 @@
   "memory_mb": 4096,
   "time": "01:00:00",
   "modules": [],
-  "chemistry_config": "/home/USERNAME/molcurator-property-test/chemistry.json",
-  "xtb_bin": "/absolute/cluster/path/to/xtb",
+  "chemistry_config": "/home/USERNAME/molcurator/configs/chemistry.json",
+  "orca_bin": "/absolute/cluster/path/to/orca",
+  "openmpi_home": "/absolute/cluster/path/to/openmpi",
+  "property": "homo_lumo_gap",
   "orca": false,
   "resume": false,
   "plots": false

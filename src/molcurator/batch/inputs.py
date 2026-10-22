@@ -1,11 +1,14 @@
-"""Independent CSV and SMILES input validation."""
+"""CSV and SMILES input files for a batch run, validated before any calculation."""
 import csv
 from pathlib import Path
+
+from molcurator.fileio import safe_id
 from molcurator.schemas import Candidate
-from molcurator.chem.calculations import safe_id
 
 
-def read_candidates(path, format="auto"):
+def read_candidates(path, format="auto") -> list[Candidate]:
+    """Candidates from a CSV (id, smiles; optional parent_smiles, round, generator) or a
+    SMILES file (SMILES and optional id per line, # comments). Ids must be unique and safe."""
     path = Path(path)
     format = ("csv" if path.suffix.lower() == ".csv" else "smi") if format == "auto" else format
     rows = []
@@ -25,9 +28,8 @@ def read_candidates(path, format="auto"):
                 fields = line.split()
                 if len(fields) > 2:
                     raise ValueError(f"SMILES line {line_number} must contain SMILES and optional ID")
-                rows.append(dict(smiles=fields[0], id=fields[1] if len(fields) == 2 else f"mol{len(rows)+1:06d}"))
-    candidates = []
-    seen = set()
+                rows.append({"smiles": fields[0], "id": fields[1] if len(fields) == 2 else f"mol{len(rows) + 1:06d}"})
+    candidates, seen = [], set()
     for row in rows:
         cid = safe_id(row["id"].strip())
         if cid in seen:
@@ -36,9 +38,9 @@ def read_candidates(path, format="auto"):
         smiles = row["smiles"].strip()
         if not smiles:
             raise ValueError(f"empty SMILES for {cid}")
-        candidates.append(Candidate(id=cid, smiles=smiles,
-            parent_smiles=(row.get("parent_smiles") or smiles).strip(),
-            round=int(row.get("round") or 1), generator=(row.get("generator") or "batch_input").strip()))
+        candidates.append(Candidate(id=cid, smiles=smiles, parent_smiles=(row.get("parent_smiles") or smiles).strip(),
+                                    round=int(row.get("round") or 1),
+                                    generator=(row.get("generator") or "batch_input").strip()))
     if not candidates:
         raise ValueError("input contains no molecules")
     return candidates
