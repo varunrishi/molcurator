@@ -19,11 +19,12 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import Descriptors, rdFingerprintGenerator, rdMolDescriptors
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import LeaveOneGroupOut, RepeatedKFold
+from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, RepeatedKFold
 
 from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status, TrainingExample, TrainResult
 
@@ -196,35 +197,58 @@ def _fit_model(name: str, seed: int, fast: bool) -> Any:
     raise ValueError("model must be one of: random_forest, ridge_size")
 
 
-def _partition_indices(
-    data: pd.DataFrame,
-    group_col: str | None,
-    train_size: int,
-    test_size: int,
-    seed: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
-    """Create disjoint train/test/pool indices, preferring whole parent groups."""
-    n = len(data)
-    if n < 3:
-        raise ValueError("At least three usable molecules are required for a test split")
-    requested_train = max(1, min(train_size, n - 2))
-    requested_test = max(1, min(test_size, n - requested_train - 1))
-    rng = np.random.default_rng(seed)
-    groups = None
+def _split_groups(data: pd.DataFrame, split: str, group_col: str | None) -> np.ndarray | None:
+    """Group label per molecule; a group is never divided between partitions. None means no grouping."""
+    if split == "scaffold":
+        # Bemis-Murcko scaffold; acyclic molecules all get "" and so form one group
+        return data["_mol"].map(lambda mol: MurckoScaffold.MurckoScaffoldSmiles(mol=mol)).to_numpy()
     if group_col and group_col in data:
         values = data[group_col].fillna("").astype(str).str.strip()
         if values.ne("").all() and values.nunique() > 1:
-            groups = values.to_numpy()
+            return values.to_numpy()
+    return None
+
+
+def _resolve_sizes(sizes: dict[str, int | float], n: int) -> dict[str, int]:
+    """Partition sizes as molecule counts: an int is a count, a float a fraction of the n usable molecules."""
+    fractions = {name: size for name, size in sizes.items() if isinstance(size, float)}
+    if any(not 0 <= size <= 1 for size in fractions.values()) or sum(fractions.values()) > 1 + 1e-9:
+        raise ValueError("fractional train/val/test sizes must each be in [0, 1] and sum to at most 1")
+    return {name: int(round(size * n)) if isinstance(size, float) else int(size) for name, size in sizes.items()}
+
+
+def _partition_indices(
+    n: int,
+    groups: np.ndarray | None,
+    train_size: int,
+    val_size: int,
+    test_size: int,
+    seed: int,
+    smallest_groups_first: bool = True,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Create disjoint train/val/test/pool indices, made of whole groups when groups are given."""
+    with_val = val_size > 0
+    if n < 3 + with_val:
+        raise ValueError("At least three usable molecules (four with a validation set) are required for a test split")
+    requested_train = max(1, min(train_size, n - 2 - with_val))
+    requested_val = max(1, min(val_size, n - requested_train - 2)) if with_val else 0
+    requested_test = max(1, min(test_size, n - requested_train - requested_val - 1))
+    rng = np.random.default_rng(seed)
     if groups is None:
         order = rng.permutation(n)
+        val_end = requested_train + requested_val
         return (
             np.sort(order[:requested_train]),
-            np.sort(order[requested_train:requested_train + requested_test]),
-            np.sort(order[requested_train + requested_test:]),
-            "stratified random split (parent IDs unavailable)",
+            np.sort(order[requested_train:val_end]),
+            np.sort(order[val_end:val_end + requested_test]),
+            np.sort(order[val_end + requested_test:]),
         )
 
-    def choose_group_indices(available: np.ndarray, target: int) -> np.ndarray:
+    # A group larger than every held-out target can only be held out by overshooting it, so it goes to train
+    held_out_targets = [size for size in (requested_val, requested_test) if size]
+    largest_held_out = max(held_out_targets)
+
+    def choose_group_indices(available: np.ndarray, target: int, oversized_first: bool = False) -> np.ndarray:
         group_to_indices: dict[str, np.ndarray] = {}
         for group in np.unique(groups[available]):
             group_to_indices[group] = available[groups[available] == group]
@@ -232,7 +256,16 @@ def _partition_indices(
         total = 0
         group_order = list(group_to_indices)
         rng.shuffle(group_order)
-        for group in sorted(group_order, key=lambda item: len(group_to_indices[item])):
+        # Few large parent groups: smallest first keeps the counts near target. Many scaffolds, a third of
+        # them singletons: smallest first would fill train with singletons, so take them in shuffled order.
+        if smallest_groups_first:
+            group_order = sorted(group_order, key=lambda item: len(group_to_indices[item]))
+        elif oversized_first:  # largest oversized group first; stable, so the rest keep their shuffled order
+            group_order = sorted(group_order, key=lambda item: (
+                len(group_to_indices[item]) <= largest_held_out,
+                -len(group_to_indices[item]) if len(group_to_indices[item]) > largest_held_out else 0,
+            ))
+        for group in group_order:
             indices = group_to_indices[group]
             if total + len(indices) <= target or not selected:
                 selected.append(indices)
@@ -241,12 +274,48 @@ def _partition_indices(
                 break
         return np.sort(np.concatenate(selected)) if selected else np.array([], dtype=int)
 
-    all_indices = np.arange(n)
-    train = choose_group_indices(all_indices, requested_train)
-    remaining = np.setdiff1d(all_indices, train, assume_unique=True)
+    remaining = np.arange(n)
+    train = choose_group_indices(remaining, requested_train, oversized_first=True)
+    remaining = np.setdiff1d(remaining, train, assume_unique=True)
+    val = choose_group_indices(remaining, requested_val) if with_val else np.array([], dtype=int)
+    remaining = np.setdiff1d(remaining, val, assume_unique=True)
     test = choose_group_indices(remaining, requested_test)
     pool = np.setdiff1d(remaining, test, assume_unique=True)
-    return train, test, pool, "parent-group-aware split"
+    return train, val, test, pool
+
+
+def _cv_splits(X_train: np.ndarray, y_train: np.ndarray, train_groups: np.ndarray | None,
+               split: str, n_splits: int, seed: int):
+    """Cross-validation folds inside train: by group when there are groups, else random K-fold."""
+    if train_groups is not None and len(np.unique(train_groups)) >= 2:
+        if split == "scaffold":  # hundreds of scaffolds: leave-one-group-out would mean hundreds of fits
+            return GroupKFold(n_splits=min(5, len(np.unique(train_groups)))).split(X_train, y_train, train_groups)
+        return LeaveOneGroupOut().split(X_train, y_train, train_groups)
+    return RepeatedKFold(n_splits=n_splits, n_repeats=1, random_state=seed).split(X_train)
+
+
+def _heldout_frame(data: pd.DataFrame, indices: np.ndarray, y_true: np.ndarray, supported: np.ndarray,
+                   predictions: np.ndarray, abs_error: np.ndarray, elements: list[str],
+                   sp: dict[str, Any]) -> pd.DataFrame:
+    """Per-molecule predictions for a held-out partition (test or validation)."""
+    frame = data.iloc[indices][[sp["id_col"], sp["smiles_col"]]].copy()
+    frame["y_true"] = y_true
+    frame["reference_" + sp["target"] + "_evaluation_only"] = y_true
+    frame["status"] = np.where(supported, "supported", "unsupported")
+    frame["reason"] = np.where(
+        supported, "", [
+            "unseen_element: " + ",".join(sorted({
+                atom.GetSymbol() for atom in data.iloc[index]["_mol"].GetAtoms()
+                if atom.GetSymbol() not in set(elements)
+            }))
+            for index in indices
+        ],
+    )
+    frame["predicted"] = predictions
+    frame["predicted_" + sp["target"]] = predictions
+    frame["absolute_error_evaluation_only"] = abs_error
+    frame["absolute_error_ev"] = abs_error
+    return frame
 
 
 def train_property_model(
@@ -258,12 +327,23 @@ def train_property_model(
     fast: bool = False,
     seed: int = 42,
     window: tuple[float, float] | None = None,
-    train_size: int = 200,
-    test_size: int = 50,
+    train_size: int | float = 200,
+    test_size: int | float = 50,
+    val_size: int | float = 0,
+    split: str = "parent",
 ) -> dict[str, Any]:
-    """Clean a labelled CSV, cross-validate, fit, and serialize a property model."""
+    """Clean a labelled CSV, cross-validate, fit, and serialize a property model.
+
+    split="parent" keeps each parent group (spec["group_col"]) in one partition; split="scaffold"
+    does the same for Bemis-Murcko scaffolds, so val and test hold only ring systems unseen in
+    training. val_size > 0 adds a validation set, scored with the train-only model like test.
+    Sizes are molecule counts (int) or fractions of the usable molecules after cleaning (float),
+    e.g. train_size=0.7, val_size=0.15, test_size=0.15; molecules left over form the pool.
+    """
     if model not in {"random_forest", "ridge_size"}:
         raise ValueError("model must be one of: random_forest, ridge_size")
+    if split not in {"parent", "scaffold"}:
+        raise ValueError("split must be one of: parent, scaffold")
     sp = _merge_spec(spec)
     raw = pd.read_csv(csv_path, keep_default_na=False)
     required = [sp["smiles_col"], sp["target"], sp["id_col"]]
@@ -273,35 +353,45 @@ def train_property_model(
     if data.empty:
         raise ValueError("No usable molecules remain after cleaning")
     y = data[sp["target"]].to_numpy(float)
-    train_idx, test_idx, pool_idx, split_method = _partition_indices(
-        data, sp.get("group_col"), train_size, test_size, seed
+    sizes = _resolve_sizes({"train": train_size, "val": val_size, "test": test_size}, len(data))
+    groups = _split_groups(data, split, sp.get("group_col"))
+    train_idx, val_idx, test_idx, pool_idx = _partition_indices(
+        len(data), groups, sizes["train"], sizes["val"], sizes["test"], seed,
+        smallest_groups_first=split != "scaffold",
+    )
+    split_method = (
+        "stratified random split (parent IDs unavailable)" if groups is None
+        else "scaffold split (Bemis-Murcko)" if split == "scaffold"
+        else "parent-group-aware split"
     )
     train_data = data.iloc[train_idx]
     elements = sorted({atom.GetSymbol() for mol in train_data["_mol"] for atom in mol.GetAtoms()})
     X = np.vstack([_build_features(mol, elements) for mol in data["_mol"]])
     X_train, y_train = X[train_idx], y[train_idx]
+    X_val, y_val = X[val_idx], y[val_idx]
     X_test, y_test = X[test_idx], y[test_idx]
+    val_supported = _supported_molecules(data, val_idx, elements)
     test_supported = _supported_molecules(data, test_idx, elements)
     pool_supported = _supported_molecules(data, pool_idx, elements)
     n_splits = min(5, max(2, len(train_idx) - 1)) if len(train_idx) >= 2 else 1
     oof = np.full(len(train_idx), np.nan)
     fold_rows: list[dict[str, Any]] = []
-    train_groups = (
-        train_data[sp["group_col"]].fillna("").astype(str).to_numpy()
-        if sp.get("group_col") and sp["group_col"] in train_data
-        else None
-    )
+    if split == "scaffold":
+        train_groups = groups[train_idx]
+    else:
+        train_groups = (
+            train_data[sp["group_col"]].fillna("").astype(str).to_numpy()
+            if sp.get("group_col") and sp["group_col"] in train_data
+            else None
+        )
     if len(train_idx) >= 2:
-        if train_groups is not None and len(np.unique(train_groups)) >= 2:
-            splits = LeaveOneGroupOut().split(X_train, y_train, train_groups)
-        else:
-            splits = RepeatedKFold(n_splits=n_splits, n_repeats=1, random_state=seed).split(X_train)
+        splits = _cv_splits(X_train, y_train, train_groups, split, n_splits, seed)
         for fold, (tr, te) in enumerate(splits):
             fitted = _fit_model(model, seed + fold, fast)
             fit_x = X_train[tr][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[tr]
-            test_x = X_train[te][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[te]
+            fold_val_x = X_train[te][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[te]
             fitted.fit(fit_x, y_train[tr])
-            pred = fitted.predict(test_x)
+            pred = fitted.predict(fold_val_x)
             oof[te] = pred
             fold_rows.append({"fold": fold, "model": model, **_metrics(y_train[te], pred)})
     valid_oof = ~np.isnan(oof)
@@ -309,12 +399,7 @@ def train_property_model(
     baseline_oof = np.full(len(y_train), np.nan)
     baseline_fold_rows: list[dict[str, Any]] = []
     if len(train_idx) >= 2:
-        if train_groups is not None and len(np.unique(train_groups)) >= 2:
-            baseline_splits = LeaveOneGroupOut().split(X_train, y_train, train_groups)
-        else:
-            baseline_splits = RepeatedKFold(
-                n_splits=n_splits, n_repeats=1, random_state=seed
-            ).split(X_train)
+        baseline_splits = _cv_splits(X_train, y_train, train_groups, split, n_splits, seed)
         for fold, (tr, te) in enumerate(baseline_splits):
             fold_baseline = float(np.mean(y_train[tr]))
             baseline_oof[te] = fold_baseline
@@ -336,6 +421,14 @@ def train_property_model(
         test_predictions[test_supported] = test_model.predict(test_features[test_supported])
     test_metric = _metrics(y_test[test_supported], test_predictions[test_supported])
     baseline_metric = _metrics(y_test[test_supported], baseline_test[test_supported])
+    # Validation is scored like test: by the model fitted on train only
+    val_features = X_val[:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_val
+    val_predictions = np.full(len(val_idx), np.nan)
+    if val_supported.any():
+        val_predictions[val_supported] = test_model.predict(val_features[val_supported])
+    abs_val_error = np.abs(y_val - val_predictions)
+    val_metric = _metrics(y_val[val_supported], val_predictions[val_supported])
+    val_baseline_metric = _metrics(y_val[val_supported], baseline_model.predict(X_val)[val_supported]) if len(val_idx) else val_metric
     test_spread = np.full(len(test_idx), np.nan)
     if test_supported.any():
         test_spread[test_supported] = _rf_std(test_model, test_features[test_supported])
@@ -371,26 +464,20 @@ def train_property_model(
         window = (float(np.min(y_train)), float(np.max(y_train)))
     oof_frame = train_data[[sp["id_col"], sp["smiles_col"]]].copy()
     oof_frame["y_true"] = y_train
-    oof_frame["oof_random_forest"] = oof
+    oof_frame[f"oof_{model}"] = oof
     oof_frame.to_csv(out / "oof_predictions.csv", index=False)
-    test_frame = data.iloc[test_idx][[sp["id_col"], sp["smiles_col"]]].copy()
-    test_frame["y_true"] = y_test
-    test_frame["reference_" + sp["target"] + "_evaluation_only"] = y_test
-    test_frame["status"] = np.where(test_supported, "supported", "unsupported")
-    test_frame["reason"] = np.where(
-        test_supported, "", [
-            "unseen_element: " + ",".join(sorted({
-                atom.GetSymbol() for atom in data.iloc[index]["_mol"].GetAtoms()
-                if atom.GetSymbol() not in set(elements)
-            }))
-            for index in test_idx
-        ],
-    )
-    test_frame["predicted"] = test_predictions
-    test_frame["predicted_" + sp["target"]] = test_predictions
-    test_frame["absolute_error_evaluation_only"] = abs_test_error
-    test_frame["absolute_error_ev"] = abs_test_error
+    test_frame = _heldout_frame(data, test_idx, y_test, test_supported, test_predictions, abs_test_error, elements, sp)
     test_frame.to_csv(out / "test_predictions.csv", index=False)
+    val_frame = _heldout_frame(data, val_idx, y_val, val_supported, val_predictions, abs_val_error, elements, sp)
+    if len(val_idx):
+        val_frame.to_csv(out / "validation_predictions.csv", index=False)
+    # Which partition every molecule landed in, and the group that kept it there
+    partition_frame = data[[sp["id_col"], sp["smiles_col"]]].copy()
+    partition_frame["split"] = "pool"
+    for name, indices in (("train", train_idx), ("val", val_idx), ("test", test_idx)):
+        partition_frame.iloc[indices, partition_frame.columns.get_loc("split")] = name
+    partition_frame["group"] = groups if groups is not None else ""
+    partition_frame.to_csv(out / "partition.csv", index=False)
     pool_frame = data.iloc[pool_idx].copy()
     pool_features = X[pool_idx]
     pool_x = pool_features[:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else pool_features
@@ -434,25 +521,25 @@ def train_property_model(
         if mask.any():
             mae_by_bin.append({"bin": str(label), "n": int(mask.sum()),
                                "mae": float(np.mean(supported_errors[mask]))})
-    group_overlap = bool(
-        sp.get("group_col")
-        and sp["group_col"] in data
-        and set(data.iloc[train_idx][sp["group_col"]].astype(str))
-        & set(data.iloc[test_idx][sp["group_col"]].astype(str))
+    # The split's own groups: scaffolds for a scaffold split (parents then legitimately cross partitions)
+    if split == "scaffold":
+        overlap_labels = groups
+    elif sp.get("group_col") and sp["group_col"] in data:
+        overlap_labels = data[sp["group_col"]].astype(str).to_numpy()
+    else:
+        overlap_labels = None
+    group_overlap = overlap_labels is not None and any(
+        set(overlap_labels[first]) & set(overlap_labels[second])
+        for first, second in ((train_idx, val_idx), (train_idx, test_idx), (val_idx, test_idx))
     )
+    partitions = {"train": train_idx, "val": val_idx, "test": test_idx, "pool": pool_idx}
     canonical_overlap = {
-        "train_test": bool(
-            set(data.iloc[train_idx]["_canonical"])
-            & set(data.iloc[test_idx]["_canonical"])
-        ),
-        "train_pool": bool(
-            set(data.iloc[train_idx]["_canonical"])
-            & set(data.iloc[pool_idx]["_canonical"])
-        ),
-        "test_pool": bool(
-            set(data.iloc[test_idx]["_canonical"])
-            & set(data.iloc[pool_idx]["_canonical"])
-        ),
+        f"{first}_{second}": bool(
+            set(data.iloc[partitions[first]]["_canonical"])
+            & set(data.iloc[partitions[second]]["_canonical"])
+        )
+        for first, second in (("train", "test"), ("train", "pool"), ("test", "pool"),
+                              ("train", "val"), ("val", "test"), ("val", "pool"))
     }
     train_elements = set(elements)
     test_unseen_elements = sorted({
@@ -462,9 +549,9 @@ def train_property_model(
         if atom.GetSymbol() not in train_elements
     })
     leakage_checks = {
-        "parent_group_overlap": {
+        f"{split}_group_overlap": {
             "status": "fail" if group_overlap else "pass",
-            "evidence": "exact group intersection between train and test",
+            "evidence": f"exact {split}-group intersection between train, val and test",
             "value": group_overlap,
         },
         "canonical_smiles_overlap": {
@@ -513,21 +600,32 @@ def train_property_model(
             int(X_train[:, _FP_NBITS_FEAT].min()), int(X_train[:, _FP_NBITS_FEAT].max())
         ],
         "cv": {"scheme_a": {model: cv_metric, "mean": cv_baseline}},
-        "test_metrics": {"random_forest": test_metric, "mean_baseline": baseline_metric},
+        "test_metrics": {model: test_metric, "mean_baseline": baseline_metric},
         "test_evaluation": {
             "n_total": len(test_idx),
             "n_supported": int(test_supported.sum()),
             "n_evaluated": int(test_supported.sum()),
         },
         "test_predictions": test_frame.to_dict("records"),
+        "validation_metrics": (
+            {model: val_metric, "mean_baseline": val_baseline_metric} if len(val_idx) else None
+        ),
+        "validation_evaluation": {
+            "n_total": len(val_idx),
+            "n_supported": int(val_supported.sum()),
+            "n_evaluated": int(val_supported.sum()),
+        },
         "partition": {
-            "requested": {"train": train_size, "test": test_size, "pool": 750},
-            "actual": {"train": len(train_idx), "test": len(test_idx), "pool": len(pool_idx)},
+            "requested": {**sizes, "pool": max(0, len(data) - sum(sizes.values()))},
+            "requested_as_given": {"train": train_size, "val": val_size, "test": test_size},
+            "actual": {"train": len(train_idx), "val": len(val_idx), "test": len(test_idx), "pool": len(pool_idx)},
+            "split": split,
             "split_method": split_method,
+            "n_groups": int(len(np.unique(groups))) if groups is not None else None,
             "group_overlap": group_overlap,
             "canonical_overlap": canonical_overlap,
             "constraints_changed_counts": bool(
-                len(train_idx) != train_size or len(test_idx) != test_size
+                len(train_idx) != sizes["train"] or len(val_idx) != sizes["val"] or len(test_idx) != sizes["test"]
             ),
         },
         "cv_means": fold_rows + baseline_fold_rows,
@@ -556,7 +654,9 @@ def train_property_model(
         "paths": {
             "model": str(out / "model.joblib"),
             "test_predictions": str(out / "test_predictions.csv"),
+            "validation_predictions": str(out / "validation_predictions.csv") if len(val_idx) else None,
             "prediction_pool": str(out / "prediction_pool.csv"),
+            "partition": str(out / "partition.csv"),
         },
         "feature_config": {
             "fingerprint": "Morgan", "radius": 2, "size": _FP_NBITS_FEAT,
@@ -652,7 +752,9 @@ def screen_pool(
 
 def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
     """TRAIN (contract, R10.2, R10.3): fit the random forest on every xTB value so far and save it in model_dir.
-    A fifth of the examples is held out to measure it; the report card is saved next to the model."""
+    A fifth of the examples is held out to measure it, as whole Murcko scaffolds: later rounds bring ring systems
+    the model has not seen, and a random split would score it on near-copies of training molecules. The report
+    card is saved next to the model."""
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     csv_path = model_dir / "training_data.csv"  # train_property_model reads a CSV; it also records the training set
@@ -663,7 +765,8 @@ def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Pa
     with warnings.catch_warnings(record=True) as caught:  # kept with the model, not printed over the progress lines
         warnings.simplefilter("always")
         card = train_property_model(csv_path, out_dir=model_dir, window=window, train_size=len(examples) - n_test,
-                                    test_size=n_test, spec={"target": "value", "units": target.units, "group_col": None,
+                                    test_size=n_test, split="scaffold",
+                                    spec={"target": "value", "units": target.units, "group_col": None,
                                                             "keep_if": {}, "drop_if": {}})  # agent data: xTB successes only
     if caught:
         card["warnings"] = [str(w.message) for w in caught]
