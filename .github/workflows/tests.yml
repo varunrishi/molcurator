@@ -30,8 +30,8 @@ jobs:
           python-version: "3.11"   # the version the suite is developed and checked with
           enable-cache: true
 
-      - name: Install (locked dependencies, with the dev group)
-        run: uv sync --locked
+      - name: Install (locked dependencies, with the dev group and the catboost extra, so its tests run)
+        run: uv sync --locked --extra catboost
 
       - name: Run the tests
         run: uv run pytest -q

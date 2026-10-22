@@ -48,6 +48,8 @@ dependencies = [
 
 [project.optional-dependencies]
 reports = ["matplotlib>=3.8"]
+# CatBoost training (tools/traincatboost.py), an alternative to the random forest; the agent does not use it yet.
+catboost = ["catboost>=1.2"]
 # Mol2Mol (REINVENT4) backend for GENERATE; REINVENT4 is installed from its git repo,
 # so it is kept optional while STONED SELFIES is the default generator.
 # reinvent = []
