@@ -18,8 +18,8 @@ Selection, in short: molecules whose QM9 DFT gap lies in the target window, minu
 zwitterions, exocyclic-imine tautomers, alpha-diketones, three-membered rings, acyclic
 molecules and anything `chem.convert.is_implausible` rejects; then two per 0.2 eV bin, each
 a different Murcko scaffold, taking the most common scaffolds and the medoid molecule of
-each. The `configs/*.yaml` seed lists are **not** updated automatically and must be kept in
-step by hand.
+each. `configs/homo_lumo.yaml` reads this CSV through `seeds_file:`, so a rewrite takes effect
+in the next run.
 
 ## QM9 (`qm9.csv`, 28 MB, gitignored)
 
@@ -60,9 +60,10 @@ cannot process, about 90 usable seed candidates remain.
 | `homo_lumo.csv` | 1 | HOMO-LUMO gap in 3.0-3.5 eV |
 | `tadf.csv` | 2 | S1-T1 gap near zero (inverted gaps count) |
 
-The `seeds:` list in `configs/homo_lumo.yaml` and `configs/tadf.yaml` must match the
-`smiles` column here. `RunConfig.seeds` takes SMILES inline, so the two can drift; a
-`seeds_file` config option would remove the duplication.
+A config takes its seeds either inline (`seeds:`, a list of SMILES) or from a CSV here
+(`seeds_file:`, a path relative to the YAML file; only the `smiles` column is read).
+`configs/homo_lumo.yaml` uses `seeds_file: ../data/seeds/homo_lumo.csv`; `configs/tadf.yaml`
+still lists its placeholder seed inline, since there is no `tadf.csv` yet.
 
 ## Size constraint
 
