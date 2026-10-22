@@ -1,0 +1,40 @@
+<!--
+  Documentation shown by the "Docs" button. Edit this file to change the text; no code changes needed.
+  The app replaces these placeholders when it shows the page:
+    {{REPO_URL}}       source code repository (from the server, or the app's default)
+    {{API_DOCS_URL}}   interactive API reference of the connected server (/api/docs)
+    {{CONTRIBUTORS}}   the people in js/contributors.js, with their GitHub avatars
+  Only plain HTML: scripts in this file are not run.
+-->
+
+<h4>What a run does</h4>
+<p>MolCurator searches for molecules whose property lies in a target window, starting from your seed. Each round it:</p>
+<ol>
+  <li><b>Plans</b> the round (rules or an LLM) and <b>generates</b> new molecules from the best ones so far (STONED SELFIES).</li>
+  <li>Runs <b>xTB</b> on a random sample of them (30 MMFF94 conformers, then one GFN2-xTB calculation each).</li>
+  <li><b>Trains an ML model</b> once enough xTB values exist, and estimates the rest with it.</li>
+  <li><b>Screens</b> candidates against the window plus the margin.</li>
+  <li>With QM on, sends the closest candidates to <b>QM</b> (ORCA DFT) within the QM budget.</li>
+  <li><b>Curates</b> molecules whose best estimate is inside the window, then decides whether to continue.</li>
+</ol>
+<p>A run stops at the dataset size, or when rounds, QM calls or time run out. Stopped runs can be resumed.</p>
+
+<h4>How far to trust a value</h4>
+<ul class="levels">
+  <li><span class="lvbadge qm">QM</span> DFT single point (e.g. B3LYP/def2-SVP). The level the target window is meant for.</li>
+  <li><span class="lvbadge xtb">xTB</span> GFN2-xTB, semi-empirical. Fast but offset from DFT: in the repo's local analysis, B3LYP gaps were on average 2.55 eV higher than xTB gaps (60 molecules).</li>
+  <li><span class="lvbadge ml">ML</span> Model trained on xTB values. The README reports a test error of about 0.5 eV: a candidate to check, not a result.</li>
+</ul>
+
+<h4>Reference</h4>
+<div class="doclinks">
+  <a class="btn sm" href="{{API_DOCS_URL}}" target="_blank" rel="noopener">Interactive API reference</a>
+  <a class="btn sm" href="{{REPO_URL}}/tree/main/docs/api" target="_blank" rel="noopener">API guide</a>
+  <a class="btn sm" href="{{REPO_URL}}#readme" target="_blank" rel="noopener">Project README</a>
+  <a class="btn sm" href="{{REPO_URL}}/blob/main/docs/trace-format.md" target="_blank" rel="noopener">Trace format</a>
+</div>
+
+<h4>Contributors</h4>
+{{CONTRIBUTORS}}
+
+<p class="doc-foot">MolCurator · Apache-2.0 · <a href="{{REPO_URL}}" target="_blank" rel="noopener">Source code</a></p>

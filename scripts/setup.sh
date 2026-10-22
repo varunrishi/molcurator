@@ -2,7 +2,7 @@
 # One-command setup for MolCurator:
 #   1. .env settings file (from .env.example)
 #   2. Python dependencies with uv (installs uv if missing)
-#   3. xtb binary (existing install, conda-forge env, or Linux release download)
+#   3. ORCA check (xTB comes with the Python dependencies, through tblite)
 #   4. Decision model: checks the Anthropic key, or sets up Ollama for the OpenAI-compatible backend
 #
 # Usage: scripts/setup.sh [--no-llm]
@@ -14,8 +14,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-XTB_VERSION="6.7.1"
-XTB_CONDA_ENV="xtb"
 TOOLS_DIR="$ROOT/.tools"
 OLLAMA_URL="http://localhost:11434"
 
@@ -73,58 +71,40 @@ fi
 uv sync
 ok "Python environment ready in .venv/"
 
-# ---------------------------------------------------------------- 3. xtb
-step "xtb"
-find_conda() {
-    local c
-    for c in "${CONDA_EXE:-}" mamba micromamba conda; do
-        if [ -n "$c" ] && command -v "$c" >/dev/null 2>&1; then
-            command -v "$c"; return 0
-        fi
-    done
-    return 1
-}
-# Print the xtb binary of the conda env $XTB_CONDA_ENV, if that env exists.
-conda_xtb_path() {
-    local prefix
-    prefix="$("$1" env list 2>/dev/null | awk -v e="$XTB_CONDA_ENV" '$1 == e { print $NF }')"
-    if [ -n "$prefix" ] && [ -x "$prefix/bin/xtb" ]; then
-        echo "$prefix/bin/xtb"
-    else
-        "$1" run -n "$XTB_CONDA_ENV" which xtb 2>/dev/null | grep '/xtb$' | tail -n 1
-    fi
-}
-
-XTB=""
-if [ -n "${XTB_BIN:-}" ] && [ -x "${XTB_BIN}" ]; then
-    XTB="$XTB_BIN"; ok "using XTB_BIN=$XTB"
-elif command -v xtb >/dev/null 2>&1; then
-    XTB="$(command -v xtb)"; ok "found xtb on PATH: $XTB"
-elif [ -x "$TOOLS_DIR/xtb/bin/xtb" ]; then
-    XTB="$TOOLS_DIR/xtb/bin/xtb"; ok "found xtb in .tools/"
-elif CONDA="$(find_conda)"; then
-    XTB="$(conda_xtb_path "$CONDA" || true)"
-    if [ -z "$XTB" ]; then
-        echo "  creating conda env '$XTB_CONDA_ENV' with xtb from conda-forge"
-        "$CONDA" create -y -n "$XTB_CONDA_ENV" -c conda-forge --override-channels "xtb=$XTB_VERSION"
-        XTB="$(conda_xtb_path "$CONDA")"
-    fi
-    ok "xtb from conda env '$XTB_CONDA_ENV': $XTB"
-elif [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
-    echo "  downloading xtb $XTB_VERSION release for Linux"
-    mkdir -p "$TOOLS_DIR/xtb"
-    curl -fsSL "https://github.com/grimme-lab/xtb/releases/download/v$XTB_VERSION/xtb-$XTB_VERSION-linux-x86_64.tar.xz" \
-        | tar -xJ -C "$TOOLS_DIR/xtb" --strip-components=1
-    XTB="$TOOLS_DIR/xtb/bin/xtb"
-    ok "xtb installed in .tools/xtb"
+# ---------------------------------------------------------------- 3. ORCA
+# xTB needs no step: it runs through tblite, installed with the Python dependencies.
+# ORCA (licensed) cannot be installed here; this only finds it and saves ORCA_BIN.
+step "ORCA"
+if [ -n "${ORCA_BIN:-}" ] && [ -x "${ORCA_BIN}" ]; then
+    ok "using ORCA_BIN=$ORCA_BIN"
+elif command -v orca >/dev/null 2>&1; then
+    set_env_var ORCA_BIN "$(command -v orca)"
+    ok "found orca on PATH: $(command -v orca) (ORCA_BIN saved to .env)"
+else
+    warn "ORCA not found"
+    PENDING+=("Install ORCA 6.1.1 or newer (free academic licence: https://orcaforum.kofo.mpg.de), then set ORCA_BIN in .env. Needed for VALIDATE and for TD-DFT targets such as s1_t1_gap")
 fi
 
-if [ -n "$XTB" ] && "$XTB" --version >/dev/null 2>&1; then
-    set_env_var XTB_BIN "$XTB"
-    ok "$("$XTB" --version 2>&1 | grep -m1 'xtb version' | sed 's/^ *\* *//; s/ compiled.*//') (XTB_BIN saved to .env)"
+# Open MPI, for ORCA on more than one core (orca_nprocs > 1): OPENMPI_HOME, else mpirun on
+# PATH, else the first conda env (or base) that has one, saved as OPENMPI_HOME.
+if [ -n "${OPENMPI_HOME:-}" ] && [ -x "${OPENMPI_HOME}/bin/mpirun" ]; then
+    ok "using OPENMPI_HOME=$OPENMPI_HOME"
+elif command -v mpirun >/dev/null 2>&1; then
+    ok "found mpirun on PATH: $(command -v mpirun)"
 else
-    warn "could not install xtb automatically"
-    PENDING+=("Install xtb: install Miniforge (https://conda-forge.org/download/) and re-run this script, or use Homebrew: brew tap grimme-lab/qc && brew install xtb")
+    MPIRUN=""
+    for base in "${CONDA_PREFIX:-}" "$HOME/miniforge3" "$HOME/mambaforge" "$HOME/miniconda3" "$HOME/anaconda3" /opt/conda; do
+        [ -n "$base" ] || continue
+        for candidate in "$base/bin/mpirun" "$base"/envs/*/bin/mpirun; do
+            if [ -x "$candidate" ]; then MPIRUN="$candidate"; break 2; fi
+        done
+    done
+    if [ -n "$MPIRUN" ]; then
+        set_env_var OPENMPI_HOME "$(dirname "$(dirname "$MPIRUN")")"
+        ok "found Open MPI: $MPIRUN (OPENMPI_HOME saved to .env)"
+    else
+        warn "Open MPI not found: ORCA runs on one core (orca_nprocs = 1)"
+    fi
 fi
 
 # ---------------------------------------------------------------- 4. LLM
@@ -179,14 +159,14 @@ fi
 
 # ---------------------------------------------------------------- 5. Check
 step "Check"
-uv run python -c "import rdkit, pyscf, chemprop, selfies, langgraph, langchain_openai, molcurator" \
+uv run python -c "import rdkit, pyscf, sklearn, selfies, langgraph, langchain_openai, tblite, opi, molcurator" \
     && ok "Python packages import" \
     || PENDING+=("Python imports failed: see the error above")
 
 # No calculations are launched here; ORCA must be installed/licensed separately.
 step "Chemistry tool preflight"
 uv run --no-sync python scripts/check_property_tools.py --backend all \
-    || PENDING+=("Chemistry preflight failed: set XTB_BIN/ORCA_BIN in .env or load cluster modules, then re-run uv run --no-sync python scripts/check_property_tools.py")
+    || PENDING+=("Chemistry preflight failed: set ORCA_BIN in .env or load cluster modules, then re-run uv run --no-sync python scripts/check_property_tools.py")
 
 if [ "${#PENDING[@]}" -eq 0 ]; then
     printf '\n\033[32mSetup complete.\033[0m Activate the environment with: source .venv/bin/activate\n'

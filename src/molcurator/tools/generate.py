@@ -11,6 +11,7 @@ from molcurator.chem.convert import (
     canonical_smiles,
     heavy_atom_count,
     is_implausible,
+    ring_profile,
     selfies_to_smiles,
     smiles_to_selfies,
 )
@@ -19,7 +20,10 @@ from molcurator.schemas import Candidate, GenerationSettings
 STONED = "stoned_selfies"
 SIZE_RANGE = (0.5, 1.5)  # candidate heavy-atom count relative to its parent; drops fragments and runaway growth
 MAX_HEAVY_ATOMS = 15  # absolute cap: keeps candidates cheap enough for xTB and QM validation
-ATTEMPTS_PER_CANDIDATE = 30  # give up on a round that keeps producing repeats or invalid molecules
+ATTEMPTS_PER_CANDIDATE = 200  # give up on a round that keeps producing repeats or invalid molecules
+# 200, not 30: keeping the parent's ring system rejects most random edits, and at 30 several
+# seeds returned 60-80 of the 100 asked for. Every seed reaches 100 at 100 attempts, and 300
+# or 1000 adds nothing, so the neighbourhood is rich enough and this was only a budget limit.
 
 
 def generate(parents: list[str], settings: GenerationSettings, round: int, rng_seed: int) -> list[Candidate]:
@@ -32,7 +36,8 @@ def generate(parents: list[str], settings: GenerationSettings, round: int, rng_s
     May return fewer than settings.n_candidates when the neighbourhood of the parents is
     exhausted. Parents themselves are never returned, and candidates much smaller or larger than
     their parent are dropped, as are candidates above MAX_HEAVY_ATOMS and strained motifs
-    (see chem.convert.is_implausible).
+    (see chem.convert.is_implausible). A candidate must also keep its parent's conjugation:
+    at least one ring if the parent had one, and still aromatic if the parent was.
     """
     if settings.generator != STONED:
         raise ValueError(f"unsupported generator {settings.generator!r}; only {STONED!r} is built")
@@ -46,6 +51,7 @@ def generate(parents: list[str], settings: GenerationSettings, round: int, rng_s
     if not parent_tokens:
         raise ValueError("generate needs at least one parent")
 
+    parent_profile = {p: ring_profile(p) for p in parent_tokens}  # ring count, is aromatic
     rng = random.Random(f"generate-{rng_seed}-{round}")  # same inputs -> same output
     # Edits draw on tokens from the parents plus the semantically robust SELFIES alphabet.
     alphabet = stoned.alphabet(*parent_tokens.values())
@@ -66,6 +72,13 @@ def generate(parents: list[str], settings: GenerationSettings, round: int, rng_s
         low, high = (f * heavy_atom_count(parent) for f in SIZE_RANGE)
         high = min(high, MAX_HEAVY_ATOMS)
         if not low <= heavy_atom_count(smiles) <= high or is_implausible(smiles):
+            continue
+        # Keep the parent's conjugation: an edit that opens a ring into a chain, or breaks
+        # aromaticity, removes what the target electronic property depends on. Ring *count*
+        # is deliberately not matched: a parent above the cap has to lose rings to shrink.
+        rings, aromatic = ring_profile(smiles)
+        parent_rings, parent_aromatic = parent_profile[parent]
+        if (parent_rings and not rings) or (parent_aromatic and not aromatic):
             continue
         seen.add(smiles)
         out.append(Candidate(id=f"r{round}-c{len(out):03d}", smiles=smiles, parent_smiles=parent,

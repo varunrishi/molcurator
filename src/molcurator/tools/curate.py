@@ -3,9 +3,28 @@
 # Writes CuratedEntry records (SMILES, XYZ structure, properties from every method,
 # provenance) to the run folder data/runs/<run_id>/, e.g. dataset.csv + xyz/ files.
 # Also handles deduplication against molecules already in the dataset.
+import csv
 from pathlib import Path
 
 from molcurator.schemas import CuratedEntry
+
+COLUMNS = ["id", "smiles", "xyz_path", "ml", "xtb", "xtb_raw", "xtb_extrapolated", "qm", "qm_method", "validated",
+           "parent", "round", "generator", "seeds"]  # fixed, so rows can be appended round after round
+
+
+def dataset_row(entry: CuratedEntry, run_dir: Path) -> dict:
+    """One dataset.csv row: a value at every level the molecule has; a missing level is empty (R11.3).
+    xtb is DFT-like when the run corrects xTB (predict.correction); xtb_raw is the value xTB calculated.
+    Any property key other than ml/xtb/xtb_raw is the QM value, named by its method."""
+    qm = {k: v for k, v in entry.properties.items() if k not in ("ml", "xtb", "xtb_raw")}
+    xyz = entry.xyz_path
+    if xyz is not None and Path(xyz).is_relative_to(run_dir):
+        xyz = Path(xyz).relative_to(run_dir)  # relative, so the run folder can be moved or shared
+    return {"id": entry.id, "smiles": entry.smiles, "xyz_path": xyz or "",
+            "ml": entry.properties.get("ml", ""), "xtb": entry.properties.get("xtb", ""),
+            "xtb_raw": entry.properties.get("xtb_raw", ""), "xtb_extrapolated": entry.provenance.get("xtb_extrapolated", ""),
+            "qm": next(iter(qm.values()), ""), "qm_method": next(iter(qm), ""), "validated": entry.validated,
+            **{k: entry.provenance.get(k, "") for k in ("parent", "round", "generator", "seeds")}}
 
 
 def curate(entries: list[CuratedEntry], run_dir: Path) -> int:
@@ -16,4 +35,42 @@ def curate(entries: list[CuratedEntry], run_dir: Path) -> int:
     canonical SMILES is already in the dataset is skipped, so re-running CURATE on resume
     (R7.2) never duplicates molecules.
     """
-    raise NotImplementedError("curate() is built in Phase 1 (tools); use FakeToolset in tests")
+    run_dir = Path(run_dir)
+    path = run_dir / "dataset.csv"
+    rows = []
+    if path.exists():
+        with path.open(newline="") as f:
+            rows = list(csv.DictReader(f))
+    ids, smiles = {r["id"] for r in rows}, {r["smiles"] for r in rows}
+    new = []
+    for e in entries:
+        if e.id not in ids and e.smiles not in smiles:  # idempotent: a resumed CURATE adds nothing (R7.2)
+            new.append(dataset_row(e, run_dir))
+            ids.add(e.id); smiles.add(e.smiles)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    with path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, COLUMNS)
+        if not path.stat().st_size:  # a new file gets the header first
+            writer.writeheader()
+        writer.writerows(new)
+    return len(rows) + len(new)
+
+
+ML_ONLY_COLUMNS = ["id", "smiles", "ml", "parent", "round", "generator", "seeds"]  # the rest is always empty
+
+
+def export_ml_only(run_dir: Path) -> int:
+    """Write dataset_ml_only.csv: the curated molecules that have only an ML value (no xTB, no QM),
+    and return how many. Rebuilt from dataset.csv each time, so it always matches it and can be re-run."""
+    run_dir = Path(run_dir)
+    path = run_dir / "dataset.csv"
+    rows = []
+    if path.exists():  # a run that curated nothing still gets an empty export, with its header
+        with path.open(newline="") as f:
+            rows = list(csv.DictReader(f))
+    ml_only = [r for r in rows if r["ml"] and not r["xtb"] and not r["qm"]]
+    with (run_dir / "dataset_ml_only.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, ML_ONLY_COLUMNS, extrasaction="ignore")  # drop the empty xtb/qm columns
+        writer.writeheader()
+        writer.writerows(ml_only)
+    return len(ml_only)

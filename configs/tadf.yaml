@@ -6,13 +6,22 @@ target:
 seeds:
   - "N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1"  # PLACEHOLDER: carbazole-benzonitrile donor-acceptor; replace
 screening:
-  margin: 0.15  # xTB-level estimate (e.g. sTDA-xTB) accepted up to 0.35 eV
-qm:
-  backend: orca
-  functional: PBE0  # TD-DFT for S1 and T1
-  basis: def2-SVP
+  margin: 0.15  # PREDICT estimate (B97-3c TD-DFT) accepted up to 0.35 eV
+# PREDICT: xTB cannot give S1 or T1, so PREDICT runs B97-3c TD-DFT through ORCA (needs ORCA).
+# That takes minutes per molecule instead of seconds, so the per-round sample is small.
+predict:
+  n_xtb: 20  # molecules computed per round (the name predates TD-DFT PREDICT)
+  # method: r2SCAN-3c   # another PREDICT level (default B97-3c); xTB cannot give S1-T1
+  # basis: def2-SVP     # only for methods without their own basis, e.g. method: PBE0
+train:
+  min_examples: 15  # train once this many have a PREDICT value (below n_xtb: some runs fail)
+# Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.
+# qm:
+#   backend: orca
+#   functional: PBE0  # TD-DFT for S1 and T1
+#   basis: def2-SVP
 budget:
   max_rounds: 5
   max_qm_calls: 10  # TD-DFT costs more per molecule than ground-state DFT
   target_dataset_size: 5
-decisions: llm  # "rules" for fast runs without an LLM
+decisions: rules  # "llm": Claude Haiku 4.5 decides (needs ANTHROPIC_API_KEY), with these rules as fallback

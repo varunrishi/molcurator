@@ -3,13 +3,14 @@ import pytest
 from rdkit import Chem
 
 from molcurator.chem import stoned
-from molcurator.chem.convert import canonical_smiles, is_implausible, selfies_to_smiles
+from molcurator.chem.convert import canonical_smiles, is_implausible, ring_profile, selfies_to_smiles
 from molcurator.schemas import GenerationSettings
 from molcurator.tools.generate import MAX_HEAVY_ATOMS, generate
 
 SEED = "c1ccc2c(c1)[nH]c1ccccc12"  # carbazole, 13 heavy atoms: fits under MAX_HEAVY_ATOMS
 OTHER = "c1ccccc1O"  # phenol: a second parent, so crossover is exercised
 OVERSIZED = "N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1"  # 21 heavy atoms, i.e. above the cap
+NH_SEED = "Nc1cc2nnoc2[nH]1"  # QM9 seed whose [nH] token gave aminyl radicals in round 1
 
 
 def test_valid_unique_canonical_and_not_the_parent():
@@ -39,6 +40,22 @@ def test_invalid_parent_and_unknown_generator_raise():
         generate(["not-a-smiles"], GenerationSettings(), 1, 0)
     with pytest.raises(ValueError):
         generate([SEED], GenerationSettings(generator="mol2mol"), 1, 0)
+
+
+def test_candidates_keep_the_parents_conjugation():
+    # Random SELFIES edits readily open a fused aromatic into a chain, which destroys the
+    # conjugation the target electronic property depends on. Such candidates are dropped.
+    for c in generate([SEED], GenerationSettings(n_candidates=50, mutation_strength=3), 1, 0):
+        rings, aromatic = ring_profile(c.smiles)
+        assert rings >= 1 and aromatic
+
+
+def test_an_aliphatic_parent_is_not_required_to_be_aromatic():
+    # The rule follows the parent: an aliphatic ring parent only has to keep a ring.
+    out = generate(["O=C1CCCCC1"], GenerationSettings(n_candidates=20), 1, 0)
+    assert len(out) == 20
+    assert all(ring_profile(c.smiles)[0] >= 1 for c in out)
+    assert not all(ring_profile(c.smiles)[1] for c in out)  # aromaticity is not forced
 
 
 def test_candidates_stay_close_in_size_to_the_parent():
@@ -73,6 +90,9 @@ def test_no_strained_motifs_in_output():
     "C1CCCCCCCCC1",     # ring above max_ring
     "C=C=C", "CC=C=C=CC", "C=C=O",  # allene, cumulene, ketene
     "c1ccc2c(c1)CC2",   # benzocyclobutene: a 4-membered ring fused onto a benzene
+    "[NH]c1nnno1", "N#Cc1nnoc1[NH]",  # aminyl radicals from a stranded [nH] token
+    "C1=[SH]C1c1cccs1", "C1=S(c2cccs2)C1", "C=C[SH]1CC=C(c2cccs2)C1",  # hypervalent S from SELFIES edits;
+    "C1=CSS(c2cccs2)=C1",  # xTB gave these near-zero gaps, which looked like hits in a real run
 ])
 def test_strained_motifs_are_rejected(smiles):
     assert is_implausible(smiles)
@@ -81,6 +101,8 @@ def test_strained_motifs_are_rejected(smiles):
 @pytest.mark.parametrize("smiles", [
     "c1ccccc1C#N",                        # nitrile: a triple bond outside a ring is fine
     "O=S(=O)(c1ccccc1)c1ccccc1",          # sulfone: two double bonds on S, a common acceptor
+    "CS(C)=O", "NS(=O)(=O)c1ccccc1",      # sulfoxide, sulfonamide: S(IV)/S(VI) only through =O
+    "c1csc(-c2cccs2)c1", "CSSC", "S=C(N)N",  # bithiophene, disulfide, thiourea: ordinary two-bonded S
     "c1ccccc1N(=O)=O",                    # neutral nitro: likewise not cumulated carbon
     "C1CC1c1ccccc1",                      # lone cyclopropyl: strained only when fused
     "c1ccc2c(c1)CCC2",                    # indane: a fused 5-ring is common and fine
@@ -102,3 +124,9 @@ def test_empty_smiles_is_not_a_molecule():
     # "" parses to an empty Mol rather than None; structure-only SELFIES decode to "".
     assert canonical_smiles("") is None
     assert selfies_to_smiles(["[Branch1]"]) is None
+
+
+def test_parents_nh_token_does_not_give_radicals():
+    out = generate([NH_SEED], GenerationSettings(n_candidates=100), 1, 0)
+    assert len(out) == 100
+    assert not any(a.GetNumRadicalElectrons() for c in out for a in Chem.MolFromSmiles(c.smiles).GetAtoms())

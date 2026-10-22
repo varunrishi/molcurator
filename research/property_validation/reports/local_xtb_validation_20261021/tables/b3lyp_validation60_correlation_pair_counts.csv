@@ -1,0 +1,10 @@
+,local_gap_ev,local_homo_ev,local_lumo_ev,local_dipole_debye,orca_gap_ev,rotatable_bonds,aromatic_atoms,ff_boltzmann_weight_local,n_unique_conformers_local
+local_gap_ev,60,60,60,60,60,60,60,60,60
+local_homo_ev,60,60,60,60,60,60,60,60,60
+local_lumo_ev,60,60,60,60,60,60,60,60,60
+local_dipole_debye,60,60,60,60,60,60,60,60,60
+orca_gap_ev,60,60,60,60,60,60,60,60,60
+rotatable_bonds,60,60,60,60,60,60,60,60,60
+aromatic_atoms,60,60,60,60,60,60,60,60,60
+ff_boltzmann_weight_local,60,60,60,60,60,60,60,60,60
+n_unique_conformers_local,60,60,60,60,60,60,60,60,60

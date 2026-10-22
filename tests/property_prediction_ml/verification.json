@@ -1,0 +1,18 @@
+{
+  "calibration_fit_test_disjoint": true,
+  "quantile_rank_90_95_verified": true,
+  "interval_nesting": true,
+  "familiar_acceptance": true,
+  "unseen_scaffold_abstention": true,
+  "size_abstention": true,
+  "wide_interval_abstention": true,
+  "invalid_radical_ion_review": true,
+  "ids_order_preserved": true,
+  "batch_id_guards": true,
+  "abstention_has_no_accepted_value": true,
+  "physical_budget_enforced": true,
+  "zero_budget_no_calls": true,
+  "physical_id_count_guards": true,
+  "input_plan_not_mutated": true,
+  "no_live_electronic_calls": true
+}

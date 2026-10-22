@@ -1,0 +1,14 @@
+{
+  "source": "QM9_smiles.txt supplied locally",
+  "source_sha256": "99be26e042e6e5ab2efebd087f1f6eb52370cd85e262730de5cdab0867e318c7",
+  "source_lines": 133015,
+  "rejected_rows": 25366,
+  "excluded_historical_rows": 336,
+  "eligible_unique_connectivities": 107040,
+  "sample_size": 1000,
+  "seed": 20261021,
+  "rdkit": "2026.09.1",
+  "python": "3.11.17 (main, Oct 14 2026, 01:04:22) [MSC v.1944 64 bit (AMD64)]",
+  "selection": "Uniform seeded sample of sorted unique nonstereochemical identities; historical 336 excluded",
+  "code_sha256": "6aec8e52d1623e72862eb3a33c6b55159367323f5468c71e1264df5f4fea7a34"
+}

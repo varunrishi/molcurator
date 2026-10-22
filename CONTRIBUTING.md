@@ -25,7 +25,8 @@ only through its signature, so the two can be built in parallel.
 |---|---|---|
 | `src/molcurator/tools/<tool>.py` | **your tool**: one function | the tool's owner |
 | `src/molcurator/schemas.py` | **the contract**: data models every tool takes and returns | everyone reads; change only by a separate PR (see below) |
-| `src/molcurator/chem/` | shared chemistry helpers (SMILES/SELFIES, STONED, geometry) | tool owners, shared |
+| `src/molcurator/chem/` | shared chemistry helpers (SMILES/SELFIES, STONED, conformers, xTB/ORCA runs) | tool owners, shared |
+| `src/molcurator/batch/` | `molcurator-properties`: batch xTB/ORCA runs, reports, SLURM | PREDICT/VALIDATE owner |
 | `tests/test_<tool>.py` | your tool's tests | the tool's owner |
 | `tests/agent/fakes.py` | fake versions of all four tools: the clearest example of what the agent expects back | read only |
 | `configs/*.yaml` | the two use cases (HOMO-LUMO gap, TADF) | rarely |
@@ -38,11 +39,11 @@ only through its signature, so the two can be built in parallel.
 ```bash
 git clone git@github.com:varunrishi/molcurator.git
 cd molcurator
-scripts/setup.sh            # uv + Python deps, xtb, .env; safe to re-run
+scripts/setup.sh            # uv + Python deps (xTB via tblite), ORCA check, .env; safe to re-run
 source .venv/bin/activate
 ```
 
-Per-machine settings go in `.env` (gitignored): `XTB_BIN`, `ORCA_BIN`, `ANTHROPIC_API_KEY`.
+Per-machine settings go in `.env` (gitignored): `ORCA_BIN`, `OPENMPI_HOME`, `ANTHROPIC_API_KEY`, `MOLCURATOR_CHEM_CONFIG`.
 See the README for details.
 
 ## The tool contract
@@ -69,11 +70,15 @@ Tool-specific obligations:
 
 - **GENERATE** (done, STONED SELFIES): only RDKit-valid molecules; ids unique within the run,
   e.g. `r{round}-c{index:03d}`. Use `tools/generate.py` as the worked example.
-- **PREDICT** (xTB): write each optimised geometry to `xyz_dir/<id>.xyz` and return the path.
-  For the TADF use case, return an xTB-level S1-T1 estimate (e.g. sTDA-xTB).
-- **VALIDATE** (ORCA by default, driven from Python by OPI / `orca-pi`; PySCF fallback): start
-  from each molecule's xTB geometry, and name the level of theory in `method`
-  (e.g. `"dft:B3LYP/def2-SVP"`).
+- **PREDICT** (done): MMFF94 geometry, then GFN2-xTB through tblite (`chem/xtb.py`), or B97-3c
+  TD-DFT through ORCA (`chem/orca.py`) for targets xTB cannot give, such as the S1-T1 gap.
+  A run config's `predict.method` / `predict.basis` override that; `Toolset.default(config.predict)`
+  wraps PREDICT so its contract signature stays `(candidates, target, xyz_dir)`.
+  Writes each geometry to `xyz_dir/<id>.xyz` and returns the path.
+- **VALIDATE** (done, ORCA driven from Python by OPI / `orca-pi`; PySCF not implemented): starts
+  from each molecule's PREDICT geometry, and names the level of theory in `method`
+  (e.g. `"dft:B3LYP/def2-SVP"`). New target properties go in `chem/orca.py` / `chem/xtb.py`.
+  xTB methods are refused in VALIDATE, which must be above PREDICT's level of theory.
 - **CURATE:** must be **idempotent**: an entry whose id or SMILES is already in the dataset is
   skipped, so re-running after an interrupted run never adds a molecule twice.
 

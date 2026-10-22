@@ -1,0 +1,19 @@
+# Conda environment for MolCurator: the way to install on Windows, and an alternative to
+# `uv sync` anywhere. Conda installs Python and tblite (xTB) from conda-forge, which has
+# Windows builds of tblite that PyPI lacks; pip then installs the package and everything
+# else from PyPI, exactly as pyproject.toml pins it. pip finds tblite already installed.
+#
+#   conda env create -f environment.yml
+#   conda activate molcurator
+#
+# ORCA (licensed) and, for parallel ORCA runs, Open MPI are installed separately: see README.
+name: molcurator
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - tblite-python=0.7  # xTB (GFN2-xTB) through tblite's Python API
+  - numpy>=2.2.6       # from conda, so tblite and the pip packages share one NumPy (orca-pi needs >= 2.2.6)
+  - pip
+  - pip:
+      - -e .

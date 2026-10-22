@@ -1,0 +1,41 @@
+{
+  "target": "GFN2-xTB HOMO-LUMO orbital gap on selected converged MMFF94 minimum",
+  "requested_sample": 1000,
+  "geometry": "ETKDGv3 30, seed42, MMFF94 max500, RMSD0.25A, sampled weights298.15K; single geometry fallback",
+  "random_split": "70/15/15 development train/validation/test; refit train+validation before one final test",
+  "scaffold_split": "Disjoint exact nonstereochemical Murcko scaffolds; all acyclic molecules one group; aim70/15/15 using group sizes only",
+  "features": "Chiral Morgan binary radius2 size2048 +13 structure descriptors; FF ablation adds selected energy, sampled weight, unique/converged minima counts",
+  "models": [
+    "mean",
+    "descriptor ridge",
+    "fingerprint+descriptor ridge",
+    "structure ExtraTrees",
+    "structure+FF ExtraTrees"
+  ],
+  "selection": "Tune hyperparameters on validation MAE only; select structure-only deployed family using validation MAE; no tuning after test",
+  "checks": [
+    "canonical connectivity uniqueness",
+    "zero train/test overlap",
+    "zero scaffold overlap for grouped split",
+    "label permutation sanity on validation",
+    "JSON reconstruction prediction equality",
+    "ordered mixed success/failure inference"
+  ],
+  "metrics": [
+    "MAE",
+    "RMSE",
+    "R2",
+    "bias",
+    "95th absolute error",
+    "fraction within0.5eV",
+    "2000-resample descriptive MAE confidence interval"
+  ],
+  "limitations": "Small neutral closed-shell QM9-like chemical space; labels are xTB rather than DFT/experiment; successful geometry subset only; no calibrated uncertainty",
+  "seed": 20261021,
+  "code_hashes": {
+    "features.py": "57e5d2da63ea03e7d17de5b7db3bb3c5477f8fd4ce2eb19f97fc6f11f031d5f3",
+    "predict_ml.py": "01ef11c07ae1ae4d691bd7cf470ebe2565be8bd74b7c4f405e40c8cdc98bd473",
+    "prepare_and_label.py": "6aec8e52d1623e72862eb3a33c6b55159367323f5468c71e1264df5f4fea7a34",
+    "train_analyse.py": "1398d13009e3df504f5304cb077987a1af13686493e3deb2e9759c5e980727ee"
+  }
+}
