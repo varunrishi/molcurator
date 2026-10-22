@@ -6,7 +6,9 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from molcurator.config import load_config
 from molcurator.schemas import Candidate, Status, TrainingExample
-from molcurator.tools.train import ml_predict, train, train_property_model
+import json
+
+from molcurator.tools.train import ml_predict, train, train_property_model, train_with
 from tests.agent.test_graph import CONFIG
 
 
@@ -70,3 +72,20 @@ def test_fractional_sizes_must_sum_to_at_most_one(tmp_path):
                    "fractional_occupation": False, "parent_mol_id": f"seed{n % 3}"} for n in range(1, 21)]).to_csv(csv_path, index=False)
     with pytest.raises(ValueError, match="sum to at most 1"):
         train_property_model(csv_path, out_dir=tmp_path / "model", fast=True, train_size=0.8, test_size=0.3)
+
+
+def test_refit_on_all_is_optional_and_fits_the_saved_model_on_every_example(tmp_path):
+    """train.refit_on_all: off by default (saved model = the measured train-only one); on, the saved model is
+    refitted on all examples after measuring, while n_examples, the split and the test metrics stay the same."""
+    smiles = [head + "C" * n for n in range(1, 21) for head in ("", "O", "N", "c1ccccc1")]
+    examples = [TrainingExample(smiles=s, value=6.0 - 0.15 * Chem.MolFromSmiles(s).GetNumHeavyAtoms()) for s in smiles]
+    target = load_config(CONFIG).target
+    assert train_with(False) is train  # the default is the plain contract function
+    plain, refit = train(examples, target, tmp_path / "plain"), train_with(True)(examples, target, tmp_path / "refit")
+    assert plain.metrics["n_fit"] == plain.metrics["n_train"] < 80  # saved model: training split only
+    assert refit.metrics["n_fit"] == 80  # saved model: every example
+    for key in ("n_train", "n_test", "n_pool", "test_mae", "baseline_mae"):
+        assert refit.metrics[key] == pytest.approx(plain.metrics[key])  # same split and measurement (parallel-sum noise)
+    assert refit.n_examples == plain.n_examples == 80
+    card = json.loads((tmp_path / "refit" / "report_card.json").read_text())
+    assert card["final_fit"] == {"refit_on_all": True, "n": 80}

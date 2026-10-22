@@ -56,7 +56,7 @@ def run_agent(config: RunConfig, tools: Toolset | None = None, decider: Decider 
     write_run_start(trace, config, nodes_for(config))
     saver = open_checkpointer(run_dir)
     try:  # the connection is closed even on Ctrl-C; every finished node's checkpoint is already saved
-        graph = build_graph(config, tools or Toolset.default(config.predict), decider, checkpointer=saver, trace=trace)
+        graph = build_graph(config, tools or Toolset.default(config.predict, config.train), decider, checkpointer=saver, trace=trace)
         steps = (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2  # every node per round, plus WRITE SUMMARY
         return graph.invoke(initial_state(run_dir.name, run_dir),
                             {"configurable": {"thread_id": run_dir.name}, "recursion_limit": steps})  # R7.1
@@ -74,7 +74,7 @@ def resume_agent(run_id: str, runs_root: str | Path = "data/runs", tools: Toolse
     saver = open_checkpointer(run_dir)
     try:
         trace = TraceWriter(run_dir, run_id, on_event)
-        graph = build_graph(config, tools or Toolset.default(config.predict), decider, checkpointer=saver, trace=trace)
+        graph = build_graph(config, tools or Toolset.default(config.predict, config.train), decider, checkpointer=saver, trace=trace)
         thread = {"configurable": {"thread_id": run_id}, "recursion_limit": (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2}
         saved = graph.get_state(thread)
         if not saved.next:  # finished (reached WRITE SUMMARY) or never checkpointed
