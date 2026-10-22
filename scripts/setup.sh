@@ -159,7 +159,7 @@ fi
 
 # ---------------------------------------------------------------- 5. Check
 step "Check"
-uv run python -c "import rdkit, pyscf, chemprop, selfies, langgraph, langchain_openai, tblite, opi, molcurator" \
+uv run python -c "import rdkit, pyscf, sklearn, selfies, langgraph, langchain_openai, tblite, opi, molcurator" \
     && ok "Python packages import" \
     || PENDING+=("Python imports failed: see the error above")
 

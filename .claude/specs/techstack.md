@@ -14,19 +14,19 @@
 |------|-----------|-------|
 | GENERATE | [RDKit](https://www.rdkit.org/), Mol2Mol via [REINVENT4](https://github.com/MolecularAI/REINVENT4), or [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies) | Seed-based generation of candidate SMILES; RDKit for sanitisation and deduplication |
 | PREDICT | RDKit (MMFF94 geometry), GFN2-xTB through [tblite](https://github.com/tblite/tblite) (Python API), or B97-3c TD-DFT through ORCA when xTB cannot give the target | SMILES → 3D geometry → single-point property (e.g. HOMO-LUMO gap, S1-T1 gap) |
-| TRAIN | [ChemProp](https://github.com/chemprop/chemprop) | Property model trained on the growing dataset; uncertainty estimates (e.g. ensembles) drive the selection for validation |
+| TRAIN | [scikit-learn](https://scikit-learn.org/) random forest (`tools/train.py`, from #21) | Property model trained on the growing xTB dataset; ChemProp was planned but never used, and was removed on 2026-10-22 so OPI can install on Intel Macs |
 | VALIDATE | [ORCA](https://www.faccts.de/orca/) through its Python interface OPI (`orca-pi`); PySCF not implemented | Higher-accuracy QM (DFT / TD-DFT for S1 and T1 energies) at `qm.functional` / `qm.basis` |
 | CURATE | pandas + Pydantic models, CSV + XYZ files per run | Stores SMILES, structure and properties for each level of theory |
 | EVALUATE | Custom pipeline over LangGraph traces | Scores agent trajectories and tool-call correctness |
 
 ## Language and environment
 
-- Python 3.11+ (ChemProp v2 requires 3.11)
+- Python 3.11+
 - Setup: `scripts/setup.sh` does everything in one command (uv + `uv sync`, ORCA check, Ollama + model, `.env`); safe to re-run
 - Packaging: `pyproject.toml` (setuptools build, `src/` layout), installable with `uv sync` (locked by `uv.lock`) or `pip install -e .`
 - Dev tools (uv dependency group `dev`): pytest, ruff, jupyter
-- Python dependencies: langgraph, langchain-core, anthropic, langchain-openai (optional backend), rdkit, selfies, pyscf, chemprop (brings torch + lightning), tblite (xTB), orca-pi (OPI), pandas, pydantic, pyyaml, typer, python-dotenv
-- Intel-Mac limits, set with platform markers in `pyproject.toml`: torch 2.2.2 (the last Intel-Mac wheel), so `numpy<2` and `rdkit<2026`; `orca-pi` (needs NumPy 2) is left out there. Other platforms get current versions; `orca-pi` itself pins `rdkit<2026`.
+- Python dependencies: langgraph, langchain-core, anthropic, langchain-openai (optional backend), rdkit, selfies, pyscf, scikit-learn + joblib (TRAIN), tblite (xTB), orca-pi (OPI), pandas, pydantic, pyyaml, typer, python-dotenv
+- Intel-Mac limit, set with a platform marker in `pyproject.toml`: `rdkit<2026` (no Intel-Mac wheels after that). With ChemProp (and torch, which capped NumPy below 2) removed, `orca-pi` (needs NumPy 2) installs on Intel Macs too; it pins `rdkit<2026` everywhere.
 - External binaries (not on PyPI):
   - **Ollama** (optional): serves a local model such as `qwen3:4b` for the OpenAI-compatible backend; not needed for the default Claude backend
 - Settings: `.env` (gitignored, created from `.env.example`): `ORCA_BIN`, `OPENMPI_HOME`, `MOLCURATOR_CHEM_CONFIG`, `MOLCURATOR_QC_TIMEOUT_S`, `ANTHROPIC_API_KEY`, `LLM_PROVIDER` (`anthropic` default, or `openai`), `LLM_MODEL` (default `claude-haiku-4-5`), and for the OpenAI-compatible backend only `LLM_BASE_URL` / `LLM_API_KEY`; variables already in the environment take precedence
@@ -76,11 +76,11 @@ round trip (~2 s). Each LLM call therefore gets a hard timeout, after which the 
 
 - `smiles`: canonical SMILES
 - `structure`: optimised 3D geometry (XYZ)
-- `properties`: per-method values, e.g. `{ "chemprop": ..., "xtb": ..., "dft": ... }`, with the uncertainty where available
+- `properties`: per-method values, e.g. `{ "ml": ..., "xtb": ..., "dft": ... }`, with the uncertainty where available
 - `provenance`: seed molecule, generator and agent step that produced it
 
 ## References
 
 - REINVENT4 / Mol2Mol: https://github.com/MolecularAI/REINVENT4
 - STONED SELFIES: https://github.com/the-matter-lab/stoned-selfies
-- ChemProp: https://github.com/chemprop/chemprop
+- scikit-learn: https://scikit-learn.org/

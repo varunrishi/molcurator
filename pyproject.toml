@@ -16,7 +16,7 @@ version = "0.1.0"
 description = "Agent that creates and curates a molecular benchmark set from a seed molecule"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"   # ChemProp v2 requires Python >= 3.11
+requires-python = ">=3.11"
 dependencies = [
     # Agent
     "langgraph>=0.2",
@@ -29,11 +29,7 @@ dependencies = [
     "rdkit>=2024.3",           # SMILES handling, sanitisation, 3D embedding
     "selfies>=2.1",            # STONED SELFIES generation
     "pyscf>=2.6",              # DFT / TD-DFT for VALIDATE
-    # ML
-    "chemprop>=2.0",           # property model + uncertainty (pulls in torch, lightning)
-    # Intel-Mac limits: torch tops out at 2.2.2 (built against NumPy 1.x),
-    # and RDKit 2026.x ships no Intel-Mac wheels
-    "numpy<2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    # RDKit 2026.x ships no Intel-Mac wheels (orca-pi pins rdkit<2026 everywhere anyway)
     "rdkit<2026; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     # Data, config, CLI
     "pandas>=2.0",
@@ -43,7 +39,7 @@ dependencies = [
     "pyyaml>=6.0",
     "typer>=0.12",
     "python-dotenv>=1.0",      # loads settings (ORCA_BIN, LLM_*) from .env
-    "orca-pi>=2.0 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    "orca-pi>=2.0",           # ORCA through its Python interface OPI (needs NumPy 2)
     "tblite>=0.7 ; sys_platform != 'win32'",  # no Windows wheels: xTB falls back to ORCA there
 ]
 
