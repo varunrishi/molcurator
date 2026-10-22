@@ -63,7 +63,7 @@ dev = [
 
 [project.scripts]
 molcurator = "molcurator.cli:app"
-molcurator-properties = "molcurator.batch.cli:main"
+molcurator-properties = "molcurator.batch.cli:main"  # batch xTB/ORCA runs, reports and SLURM jobs
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -25,7 +25,8 @@ only through its signature, so the two can be built in parallel.
 |---|---|---|
 | `src/molcurator/tools/<tool>.py` | **your tool**: one function | the tool's owner |
 | `src/molcurator/schemas.py` | **the contract**: data models every tool takes and returns | everyone reads; change only by a separate PR (see below) |
-| `src/molcurator/chem/` | shared chemistry helpers (SMILES/SELFIES, STONED, geometry) | tool owners, shared |
+| `src/molcurator/chem/` | shared chemistry helpers (SMILES/SELFIES, STONED, conformers, xTB/ORCA runs) | tool owners, shared |
+| `src/molcurator/batch/` | `molcurator-properties`: batch xTB/ORCA runs, reports, SLURM | PREDICT/VALIDATE owner |
 | `tests/test_<tool>.py` | your tool's tests | the tool's owner |
 | `tests/agent/fakes.py` | fake versions of all four tools: the clearest example of what the agent expects back | read only |
 | `configs/*.yaml` | the two use cases (HOMO-LUMO gap, TADF) | rarely |

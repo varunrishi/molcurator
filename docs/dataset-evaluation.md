@@ -12,7 +12,7 @@ From the repository root in a Python environment with RDKit and Pydantic 2:
 
 ```bash
 python scripts/evaluate_dataset.py \
-  subprojects/property_validation_v1/molcurator_properties_for_collaborators.csv \
+  data/properties/molcurator_properties_for_collaborators.csv \
   --format csv --min 3 --max 3.5 --qm-method dft:B3LYP/def2-SVP \
   --json-out evaluation.json --csv-out evaluation-molecules.csv
 ```

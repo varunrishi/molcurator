@@ -1,0 +1,16 @@
+{
+  "events": 948,
+  "cache_hits": 0,
+  "electronic_calls_attempted": 948,
+  "by_backend": {
+    "xtb": 948,
+    "orca": 0
+  },
+  "failed_events": 0,
+  "running_or_interrupted": 0,
+  "runtime_s": 115.44900000072084,
+  "record_errors_count": 0,
+  "program_versions": [
+    "6.7.1pre"
+  ]
+}

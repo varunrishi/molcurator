@@ -312,13 +312,23 @@ src/molcurator/
 └── cli.py       `molcurator` command
 configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml), example chemistry/SLURM settings
 data/seeds/      seed molecules
+data/properties/ shared xTB/ORCA property dataset (PROPERTY_DATA.md)
 data/runs/       per-run outputs (gitignored)
+docs/chemistry/  guides from the earlier xtb-binary implementation (superseded; see Property tools above)
+research/        study results, e.g. the local xTB validation report
 tests/           tool tests, plus tests/agent/ for the agent
 notebooks/       exploration and demo plots
 scripts/         helper scripts
 demo/            presentation and video assets
 assets/          logo and README images
 ```
+## Troubleshooting
+
+- **xTB not available:** xTB runs through tblite, a Python dependency (`uv sync`; on Windows, `environment.yml`). Without tblite, GFN2-/GFN1-xTB fall back to ORCA's built-in xTB. `python scripts/check_property_tools.py` reports which engine is used.
+- **Missing `ANTHROPIC_API_KEY`:** add `ANTHROPIC_API_KEY=...` to `.env`, or set `decisions: rules` in the run config so no LLM is called.
+- **ORCA not found:** set `ORCA_BIN=/path/to/orca` in `.env`. ORCA is needed when the config has a `qm:` section, and for PREDICT on targets xTB cannot give (`s1_t1_gap`); the PySCF backend is not implemented.
+- **Run interrupted (e.g. Ctrl-C):** continue with `molcurator run --resume <run_id>`. The run's saved config is used.
+- **Local model (Ollama) is slow:** a CPU-only laptop takes about 40 s per decision with Qwen3 4B. Use the default Claude backend or `decisions: rules` instead.
 
 ## Roadmap
 

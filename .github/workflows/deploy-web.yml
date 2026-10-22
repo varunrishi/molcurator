@@ -1,0 +1,46 @@
+# Publishes the web app (app/web) to GitHub Pages.
+# Runs when app/web changes on main, or by hand (Actions tab -> "Deploy web app" -> Run workflow).
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write      # publish to Pages
+  id-token: write   # prove to Pages that the upload comes from this workflow
+
+concurrency:        # one deployment at a time; never cancel one that is running
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app has no build step: check that the files it loads are there, then publish the folder as is.
+      - name: Check the web app files
+        run: |
+          for f in index.html css/styles.css js/app.js templates/documentation.html \
+                   lib/openchemlib-full.js lib/3Dmol-min.js; do
+            test -f "app/web/$f" || { echo "missing app/web/$f"; exit 1; }
+          done
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

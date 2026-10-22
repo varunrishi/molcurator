@@ -1,0 +1,7 @@
+id,smiles
+familiar,CC1=C(C(N)=O)COC1
+unseen,Cc1c[nH]c2[nH]cnc12
+large,CCCCCCCCCCCCCCCC
+invalid,not_a_smiles
+radical,[CH3]
+ion,[NH4+]
