@@ -50,7 +50,7 @@ seed molecule + target property
 |------|---------|
 | `GENERATE` | Generate new molecules (SMILES / coordinates) from a seed molecule |
 | `PREDICT`  | SMILES → MMFF94 geometry → GFN2-xTB property (or B97-3c TD-DFT when xTB cannot give it, e.g. S1-T1) |
-| `TRAIN`    | Train a Random Forest model for the target property on the growing dataset; CatBoost is a planned alternative and is not implemented yet |
+| `TRAIN`    | Train a Random Forest model for the target property on the growing dataset; a CatBoost alternative exists as a separate tool, not yet used by the agent |
 | `VALIDATE` | Compute the property for screened molecules with more accurate quantum chemistry methods |
 | `CURATE`   | Add verified molecules to the dataset with SMILES, structure and multi-level properties |
 | `EVALUATE` | Evaluate the agent's trajectories and tool calls |
@@ -65,7 +65,7 @@ seed molecule + target property
 - **Orchestrator**: [LangGraph](https://github.com/langchain-ai/langgraph)
 - **Decision model**: [Claude Haiku 4.5](https://docs.claude.com/) through the Anthropic SDK (~2 s per decision); optionally any OpenAI-compatible endpoint, such as a local model in Ollama
 - **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
-- **Property prediction (ML)**: Random Forest on Morgan fingerprints and RDKit descriptors ([scikit-learn](https://scikit-learn.org/)); [CatBoost](https://catboost.ai/) is a planned training alternative and is not implemented yet.
+- **Property prediction (ML)**: Random Forest on Morgan fingerprints and RDKit descriptors ([scikit-learn](https://scikit-learn.org/)); [CatBoost](https://catboost.ai/) is available as an alternative in `tools/traincatboost.py` (install with `uv sync --extra catboost`), not yet used by the agent.
 - **Semi-empirical**: GFN2-xTB through [tblite](https://github.com/tblite/tblite)'s Python API (no binary)
 - **Quantum chemistry**: [ORCA](https://www.faccts.de/orca/) 6.1.1+, driven from Python by OPI (`orca-pi`)
 
