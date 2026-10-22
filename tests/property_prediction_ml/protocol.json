@@ -1,0 +1,28 @@
+{
+  "seeds": [
+    20261022,
+    20261023,
+    20261024,
+    20261025,
+    20261026
+  ],
+  "n_estimators": 160,
+  "max_features": 0.7,
+  "min_samples_leaf": 1,
+  "model_and_partition_seed_varied": true,
+  "baseline_development_fraction": 0.85,
+  "calibrated_fit_fraction": 0.65,
+  "calibration_fraction": 0.2,
+  "test_fraction": 0.15,
+  "hyperparameters_fixed_from_previous_experiment": true,
+  "nominal_coverages": [
+    0.9,
+    0.95
+  ],
+  "scale_floor_ev": 0.1,
+  "similarity_cutoff": "max(0.25, 10th percentile of fit-only leave-one-out nearest similarity)",
+  "unseen_scaffold_abstains": true,
+  "maximum_90_interval_halfwidth_ev": 1.0,
+  "deployment": "first random seed fixed before tests; no best-seed selection",
+  "no_new_electronic_calculations": true
+}

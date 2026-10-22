@@ -1,0 +1,3 @@
+kind,accepted_fraction_mean,accepted_fraction_min,accepted_fraction_max,accepted_mae_mean_ev,routed_mae_mean_ev,accepted_90_coverage_mean
+random,0.3216783216783216,0.2377622377622377,0.3566433566433566,0.3134440700790022,0.615280612844027,0.8690960906101571
+scaffold,0.0,0.0,0.0,,0.5445681395471188,

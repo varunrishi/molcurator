@@ -1,0 +1,85 @@
+{
+  "n": 948,
+  "seeds": [
+    20261022,
+    20261023,
+    20261024,
+    20261025,
+    20261026
+  ],
+  "checks": [
+    {
+      "kind": "random",
+      "seed": 20261022,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": false,
+      "group_balance_seed_offset": 0
+    },
+    {
+      "kind": "random",
+      "seed": 20261023,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": false,
+      "group_balance_seed_offset": 0
+    },
+    {
+      "kind": "random",
+      "seed": 20261024,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": false,
+      "group_balance_seed_offset": 0
+    },
+    {
+      "kind": "random",
+      "seed": 20261025,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": false,
+      "group_balance_seed_offset": 0
+    },
+    {
+      "kind": "random",
+      "seed": 20261026,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": false,
+      "group_balance_seed_offset": 0
+    },
+    {
+      "kind": "scaffold",
+      "seed": 20261022,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": true,
+      "group_balance_seed_offset": 23
+    },
+    {
+      "kind": "scaffold",
+      "seed": 20261023,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": true,
+      "group_balance_seed_offset": 6
+    },
+    {
+      "kind": "scaffold",
+      "seed": 20261024,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": true,
+      "group_balance_seed_offset": 5
+    },
+    {
+      "kind": "scaffold",
+      "seed": 20261025,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": true,
+      "group_balance_seed_offset": 60
+    },
+    {
+      "kind": "scaffold",
+      "seed": 20261026,
+      "fit_calibration_test_disjoint": true,
+      "scaffold_disjoint": true,
+      "group_balance_seed_offset": 9
+    }
+  ],
+  "wall_s": 60.8642886999296,
+  "input_sha256": "2f6374e5c5bb1f4f3ec6e5cbcdeef2fcb189059c1a58acd09686b561e2b97434",
+  "new_electronic_calls": 0
+}

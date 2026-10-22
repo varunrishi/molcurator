@@ -1,0 +1,126 @@
+[
+  {
+    "candidate_id": "familiar",
+    "smiles": "CC1=C(C(N)=O)COC1",
+    "status": "ok",
+    "route": "use_ml",
+    "accepted_ml_value_ev": 3.4531868552709994,
+    "ml_estimate_ev": 3.4531868552709994,
+    "xyz_path": null,
+    "reasons": [],
+    "units": "eV",
+    "nearest_fit_tanimoto": 1.0,
+    "similarity_threshold": 0.25,
+    "scaffold": "C1=CCOC1",
+    "reference_method": "GFN2-xTB on selected MMFF94 geometry",
+    "interval90_ev": [
+      3.235742963757716,
+      3.670630746784283
+    ],
+    "interval95_ev": [
+      3.1802782624805457,
+      3.726095448061453
+    ],
+    "interval_method": "normalized split conformal",
+    "coverage_caveat": "Marginal calibration does not guarantee coverage under scaffold shift or after acceptance filtering"
+  },
+  {
+    "candidate_id": "unseen",
+    "smiles": "Cc1c[nH]c2[nH]cnc12",
+    "status": "abstain",
+    "route": "physical_predict",
+    "accepted_ml_value_ev": null,
+    "ml_estimate_ev": 3.554920531677933,
+    "xyz_path": null,
+    "reasons": [
+      "unseen_scaffold",
+      "wide_interval"
+    ],
+    "units": "eV",
+    "nearest_fit_tanimoto": 0.2647058823529412,
+    "similarity_threshold": 0.25,
+    "scaffold": "c1cc2nc[nH]c2[nH]1",
+    "reference_method": "GFN2-xTB on selected MMFF94 geometry",
+    "interval90_ev": [
+      2.0437216821679467,
+      5.066119381187919
+    ],
+    "interval95_ev": [
+      1.658251241149122,
+      5.451589822206744
+    ],
+    "interval_method": "normalized split conformal",
+    "coverage_caveat": "Marginal calibration does not guarantee coverage under scaffold shift or after acceptance filtering"
+  },
+  {
+    "candidate_id": "large",
+    "smiles": "CCCCCCCCCCCCCCCC",
+    "status": "abstain",
+    "route": "physical_predict",
+    "accepted_ml_value_ev": null,
+    "ml_estimate_ev": 10.694311352383723,
+    "xyz_path": null,
+    "reasons": [
+      "low_similarity",
+      "outside_size_scope",
+      "wide_interval"
+    ],
+    "units": "eV",
+    "nearest_fit_tanimoto": 0.18181818181818182,
+    "similarity_threshold": 0.25,
+    "scaffold": "ACYCLIC",
+    "reference_method": "GFN2-xTB on selected MMFF94 geometry",
+    "interval90_ev": [
+      8.513331974525014,
+      12.875290730242432
+    ],
+    "interval95_ev": [
+      7.957016647188205,
+      13.431606057579241
+    ],
+    "interval_method": "normalized split conformal",
+    "coverage_caveat": "Marginal calibration does not guarantee coverage under scaffold shift or after acceptance filtering"
+  },
+  {
+    "candidate_id": "invalid",
+    "smiles": "not_a_smiles",
+    "status": "failed",
+    "route": "input_review",
+    "accepted_ml_value_ev": null,
+    "ml_estimate_ev": null,
+    "xyz_path": null,
+    "reasons": [
+      "invalid_or_unsupported_input"
+    ],
+    "units": "eV",
+    "error": "ValueError: one valid connected molecule required"
+  },
+  {
+    "candidate_id": "radical",
+    "smiles": "[CH3]",
+    "status": "failed",
+    "route": "input_review",
+    "accepted_ml_value_ev": null,
+    "ml_estimate_ev": null,
+    "xyz_path": null,
+    "reasons": [
+      "invalid_or_unsupported_input"
+    ],
+    "units": "eV",
+    "error": "ValueError: neutral closed-shell molecules required"
+  },
+  {
+    "candidate_id": "ion",
+    "smiles": "[NH4+]",
+    "status": "failed",
+    "route": "input_review",
+    "accepted_ml_value_ev": null,
+    "ml_estimate_ev": null,
+    "xyz_path": null,
+    "reasons": [
+      "invalid_or_unsupported_input"
+    ],
+    "units": "eV",
+    "error": "ValueError: neutral closed-shell molecules required"
+  }
+]
