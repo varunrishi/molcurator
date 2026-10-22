@@ -217,6 +217,9 @@ from molcurator.config import load_config
 state = run_agent(load_config("configs/homo_lumo.yaml"))
 ```
 
+[`notebooks/run_agent.ipynb`](notebooks/run_agent.ipynb) walks through one small run with the real tools (about 2
+minutes) and its results: round stats, `dataset.csv`, the summary and the curated molecules.
+
 ## Project structure
 
 ```
