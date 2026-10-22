@@ -10,6 +10,7 @@ from molcurator.tools.generate import MAX_HEAVY_ATOMS, generate
 SEED = "c1ccc2c(c1)[nH]c1ccccc12"  # carbazole, 13 heavy atoms: fits under MAX_HEAVY_ATOMS
 OTHER = "c1ccccc1O"  # phenol: a second parent, so crossover is exercised
 OVERSIZED = "N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1"  # 21 heavy atoms, i.e. above the cap
+NH_SEED = "Nc1cc2nnoc2[nH]1"  # QM9 seed whose [nH] token gave aminyl radicals in round 1
 
 
 def test_valid_unique_canonical_and_not_the_parent():
@@ -89,6 +90,7 @@ def test_no_strained_motifs_in_output():
     "C1CCCCCCCCC1",     # ring above max_ring
     "C=C=C", "CC=C=C=CC", "C=C=O",  # allene, cumulene, ketene
     "c1ccc2c(c1)CC2",   # benzocyclobutene: a 4-membered ring fused onto a benzene
+    "[NH]c1nnno1", "N#Cc1nnoc1[NH]",  # aminyl radicals from a stranded [nH] token
 ])
 def test_strained_motifs_are_rejected(smiles):
     assert is_implausible(smiles)
@@ -118,3 +120,9 @@ def test_empty_smiles_is_not_a_molecule():
     # "" parses to an empty Mol rather than None; structure-only SELFIES decode to "".
     assert canonical_smiles("") is None
     assert selfies_to_smiles(["[Branch1]"]) is None
+
+
+def test_parents_nh_token_does_not_give_radicals():
+    out = generate([NH_SEED], GenerationSettings(n_candidates=100), 1, 0)
+    assert len(out) == 100
+    assert not any(a.GetNumRadicalElectrons() for c in out for a in Chem.MolFromSmiles(c.smiles).GetAtoms())

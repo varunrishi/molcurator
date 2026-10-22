@@ -72,10 +72,15 @@ def _has_strained_fused_ring(rings: tuple[tuple[int, ...], ...], min_fused: int)
 
 
 def is_implausible(smiles: str, max_ring: int = 8, min_fused_ring: int = 5) -> bool:
-    """True for strained motifs that random SELFIES edits produce often but chemists rarely want:
-    rings larger than max_ring, small rings fused onto another ring, triple bonds inside rings,
-    and cumulated double bonds."""
+    """True for structures that random SELFIES edits produce often but chemists rarely want:
+    radicals, rings larger than max_ring, small rings fused onto another ring, triple bonds
+    inside rings, and cumulated double bonds."""
     mol = Chem.MolFromSmiles(smiles)
+    # Radicals: SELFIES never adds H to a bracket atom, so a parent's [nH] token ([NH1]) left
+    # with one bond after an edit decodes to an aminyl radical. Sanitisation accepts it, but
+    # PREDICT takes closed-shell molecules only.
+    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return True
     rings = mol.GetRingInfo().AtomRings()  # mol must stay referenced: RingInfo does not own it
     if any(len(r) > max_ring for r in rings):
         return True
