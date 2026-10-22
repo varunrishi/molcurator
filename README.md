@@ -263,19 +263,14 @@ scripts/         helper scripts
 demo/            presentation and video assets
 assets/          logo and README images
 ```
+
 ## Troubleshooting
 
 - **`xtb` not found:** set `XTB_BIN=/path/to/xtb` in `.env`, or re-run `scripts/setup.sh`, which finds or installs xtb and saves the path.
 - **Missing `ANTHROPIC_API_KEY`:** add `ANTHROPIC_API_KEY=...` to `.env`, or set `decisions: rules` in the run config so no LLM is called.
-- **ORCA not found:** set `ORCA_BIN=/path/to/orca` in `.env`, or set `qm.backend: pyscf` in the run config. ORCA is only needed when the config has a `qm:` section.
+- **ORCA not found:** set `ORCA_BIN=/path/to/orca` in `.env`. ORCA is the only QM backend so far (PySCF is planned), and it is only needed when the config has a `qm:` section.
 - **Run interrupted (e.g. Ctrl-C):** continue with `molcurator run --resume <run_id>`. The run's saved config is used.
 - **Local model (Ollama) is slow:** a CPU-only laptop takes about 40 s per decision with Qwen3 4B. Use the default Claude backend or `decisions: rules` instead.
-
-## Troubleshooting
-
-- **`xtb` not found:** set `XTB_BIN=/path/to/xtb` in `.env`, or re-run `scripts/setup.sh`, which finds or installs xtb and saves the path.
-- **Missing `ANTHROPIC_API_KEY`:** add `ANTHROPIC_API_KEY=...` to `.env`, or set `decisions: rules` in the run config so no LLM is called.
-- **ORCA not found:** set `ORCA_BIN=/path/to/orca` in `.env`, or set `qm.backend: pyscf` in the run config. ORCA is only needed when the config has a `qm:` section.
 
 ## Roadmap
 
