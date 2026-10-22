@@ -95,6 +95,9 @@ class TrainSettings(StrictModel):
     # Train once this many molecules have xTB values (R10.2). Below predict.n_xtb (200), because ~7% of
     # xTB runs fail: 200 runs give ~186 values, and 200 would make round 1 skip TRAIN and leave its rest unscored.
     min_examples: int = Field(default=150, ge=1)
+    # Off: the saved model is the one fitted on the training split, as measured. On: after measuring it, the
+    # saved model is refitted on every xTB value, so held-out ring systems reach ML PREDICT too.
+    refit_on_all: bool = False
 
 
 class QMConfig(QMSettings):

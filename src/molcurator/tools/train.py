@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import warnings
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -331,6 +332,7 @@ def train_property_model(
     test_size: int | float = 50,
     val_size: int | float = 0,
     split: str = "parent",
+    refit_on_all: bool = False,
 ) -> dict[str, Any]:
     """Clean a labelled CSV, cross-validate, fit, and serialize a property model.
 
@@ -339,6 +341,9 @@ def train_property_model(
     training. val_size > 0 adds a validation set, scored with the train-only model like test.
     Sizes are molecule counts (int) or fractions of the usable molecules after cleaning (float),
     e.g. train_size=0.7, val_size=0.15, test_size=0.15; molecules left over form the pool.
+    refit_on_all=True fits the saved model, after the test metrics are measured, on every usable
+    molecule (train, val, test and pool) whose elements the model knows, so held-out ring systems also
+    reach it; the reported metrics then describe the train-only model, a cautious estimate.
     """
     if model not in {"random_forest", "ridge_size"}:
         raise ValueError("model must be one of: random_forest, ridge_size")
@@ -446,11 +451,14 @@ def train_property_model(
         shuffled_r2 = _metrics(y_test[test_supported], shuffled_predictions)["r2"]
     else:
         shuffled_r2 = None
+    # The saved model: on train only, or (refit_on_all) on every molecule whose elements the features cover
+    fit_idx = np.arange(len(data)) if refit_on_all else np.asarray(train_idx)
+    fit_idx = fit_idx[_supported_molecules(data, fit_idx, elements)] if refit_on_all else fit_idx
     final = _fit_model(model, seed, fast)
     final.fit(
-        X_train[:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]]
-        if model == "ridge_size" else X_train,
-        y_train,
+        X[fit_idx][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]]
+        if model == "ridge_size" else X[fit_idx],
+        y[fit_idx],
     )
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -663,6 +671,7 @@ def train_property_model(
             "descriptors": list(DESCRIPTOR_NAMES), "elements": elements,
         },
         "model_parameters": final.get_params(),
+        "final_fit": {"refit_on_all": refit_on_all, "n": int(len(fit_idx))},  # what the saved model learned from
     }
     bundle = {
         "model": final, "feature_names": _feature_names(elements), "elements": elements,
@@ -754,7 +763,23 @@ def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Pa
     """TRAIN (contract, R10.2, R10.3): fit the random forest on every xTB value so far and save it in model_dir.
     A fifth of the examples is held out to measure it, as whole Murcko scaffolds: later rounds bring ring systems
     the model has not seen, and a random split would score it on near-copies of training molecules. The report
-    card is saved next to the model."""
+    card is saved next to the model. The saved model is the train-only one; train_with(refit_on_all=True)
+    makes a train() whose saved model is refitted on every example after it is measured."""
+    return _train(examples, target, model_dir, refit_on_all=False)
+
+
+def train_with(refit_on_all: bool = False) -> Callable[..., TrainResult]:
+    """train() with the run config's train.refit_on_all, keeping train()'s exact signature (the tool contract)."""
+    if not refit_on_all:
+        return train
+
+    def train_refit(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
+        return _train(examples, target, model_dir, refit_on_all=True)
+
+    return train_refit
+
+
+def _train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path, refit_on_all: bool) -> TrainResult:
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     csv_path = model_dir / "training_data.csv"  # train_property_model reads a CSV; it also records the training set
@@ -765,7 +790,7 @@ def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Pa
     with warnings.catch_warnings(record=True) as caught:  # kept with the model, not printed over the progress lines
         warnings.simplefilter("always")
         card = train_property_model(csv_path, out_dir=model_dir, window=window, train_size=len(examples) - n_test,
-                                    test_size=n_test, split="scaffold",
+                                    test_size=n_test, split="scaffold", refit_on_all=refit_on_all,
                                     spec={"target": "value", "units": target.units, "group_col": None,
                                                             "keep_if": {}, "drop_if": {}})  # agent data: xTB successes only
     if caught:
@@ -776,7 +801,8 @@ def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Pa
     metrics = {"test_mae": test["mae"], "test_rmse": test["rmse"], "test_r2": test["r2"],
                "baseline_mae": base["mae"], "go": float(card["go"]),
                # the model is fitted on n_train; the split always keeps >= 1 back as a screening pool
-               "n_train": float(split["train"]), "n_test": float(split["test"]), "n_pool": float(split["pool"])}
+               "n_train": float(split["train"]), "n_test": float(split["test"]), "n_pool": float(split["pool"]),
+               "n_fit": float(card["final_fit"]["n"])}  # what the saved model learned from: n_train, or all (refit)
     # n_examples is every xTB value TRAIN was given (the contract, as the fakes and trace evaluator read it)
     return TrainResult(model_path=Path(card["paths"]["model"]), n_examples=len(examples),
                        metrics={k: v for k, v in metrics.items() if np.isfinite(v)})  # NaN is not valid JSON

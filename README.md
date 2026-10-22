@@ -282,8 +282,12 @@ from molcurator.config import load_config
 state = run_agent(load_config("configs/homo_lumo.yaml"))
 ```
 
-[`notebooks/run_agent.ipynb`](notebooks/run_agent.ipynb) walks through one small run with the real tools (about 2
-minutes) and its results: round stats, `dataset.csv`, the summary and the curated molecules.
+[`notebooks/run_agent.ipynb`](notebooks/run_agent.ipynb) walks through one small run with the real tools (under a
+minute) and its results: round stats, `dataset.csv`, the summary and the curated molecules.
+
+`train.refit_on_all: true` makes TRAIN refit the saved model on every xTB value after measuring it, so the
+ring systems held out for the test also reach ML PREDICT. It is off by default; on real data it lowered the
+next round's ML error by about 3% (0.68 → 0.66 eV), and the reported test MAE becomes a cautious estimate.
 
 ## Property tools and batch runs
 
