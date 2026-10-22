@@ -51,6 +51,7 @@ class AgentState(TypedDict):
     round_plan: dict | None  # this round's plan decision (RoundPlan.model_dump()), plain data
     model: dict | None  # latest TrainResult (model_dump()), plain data; None until TRAIN first runs (R10.3)
     qm_batch: list[str]  # ids chosen for VALIDATE this round
+    qm_batch_dropped: dict[str, list[str]]  # ids the decider chose that were cut: "not_offered", "over_budget" (R4.2)
     dataset_size: int  # as returned by CURATE
     ml_only_size: int  # rows in dataset_ml_only.csv, written by WRITE SUMMARY at the end of the run
     round_stats: list[RoundStats]  # one per finished round; QM calls used = sum of qm_calls

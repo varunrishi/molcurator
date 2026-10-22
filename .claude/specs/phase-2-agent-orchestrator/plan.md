@@ -225,10 +225,11 @@ Add `anthropic` (1.17.0 resolves here), `langgraph-checkpoint-sqlite` (3.1.2) an
    (`decisions: rules`) with QM off: SEED → GENERATE → PREDICT → TRAIN → ML PREDICT → SCREEN →
    CURATE, repeating rounds until `target_dataset_size` (or another budget) is reached.
 
-   **Known limitation, QM on:** ML-only molecules have no geometry, so if one is picked for the QM
-   batch, VALIDATE fails (QM needs a starting geometry). Parked fix ("option A"): at the start of
-   VALIDATE, run xTB (`tools.predict`) on batch molecules without a geometry, drop those whose xTB
-   fails from the batch, then validate as usual. No contract change needed.
+   **ML-only molecules with QM on** have no geometry, which QM needs as a start. Done ("option A",
+   in `validate_node`): VALIDATE first runs xTB (`tools.predict`) on batch molecules without a
+   geometry; those whose xTB fails are marked failed and skip QM, the rest are validated as usual.
+   No contract change was needed. QM is on only when the config has a `qm:` section (R11.1), and the
+   rules spread `max_qm_calls` evenly over the rounds left.
 7. **Graph:** `build_graph`, routing, budget-guarded loop, error route to summary; first
    end-to-end run with fakes and rules. — R1.1, R1.7, R4.3, R4.4
 8. **LLM decisions:** `summaries.py`, `prompts.py`, `LLMDecider` (Anthropic, then OpenAI

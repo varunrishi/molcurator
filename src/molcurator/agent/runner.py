@@ -10,7 +10,7 @@ import yaml
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from molcurator.agent.decisions import Decider, RuleDecider
-from molcurator.agent.graph import NODES, build_graph, initial_state
+from molcurator.agent.graph import build_graph, initial_state, nodes_for
 from molcurator.agent.toolset import Toolset
 from molcurator.agent.trace import TraceWriter, write_run_start
 from molcurator.config import RunConfig, load_config
@@ -51,11 +51,11 @@ def run_agent(config: RunConfig, tools: Toolset | None = None, decider: Decider 
     decider = decider or default_decider(config)  # checked before the folder exists, so no empty run is left behind
     run_dir = create_run_dir(config, runs_root, run_id)
     trace = TraceWriter(run_dir, run_dir.name, on_event)
-    write_run_start(trace, config, NODES)
+    write_run_start(trace, config, nodes_for(config))
     saver = open_checkpointer(run_dir)
     try:  # the connection is closed even on Ctrl-C; every finished node's checkpoint is already saved
         graph = build_graph(config, tools or Toolset.default(), decider, checkpointer=saver, trace=trace)
-        steps = (len(NODES) - 1) * config.budget.max_rounds + 2  # every node per round, plus WRITE SUMMARY
+        steps = (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2  # every node per round, plus WRITE SUMMARY
         return graph.invoke(initial_state(run_dir.name, run_dir),
                             {"configurable": {"thread_id": run_dir.name}, "recursion_limit": steps})  # R7.1
     finally:
@@ -73,14 +73,14 @@ def resume_agent(run_id: str, runs_root: str | Path = "data/runs", tools: Toolse
     try:
         trace = TraceWriter(run_dir, run_id, on_event)
         graph = build_graph(config, tools or Toolset.default(), decider, checkpointer=saver, trace=trace)
-        thread = {"configurable": {"thread_id": run_id}, "recursion_limit": (len(NODES) - 1) * config.budget.max_rounds + 2}
+        thread = {"configurable": {"thread_id": run_id}, "recursion_limit": (len(nodes_for(config)) - 1) * config.budget.max_rounds + 2}
         saved = graph.get_state(thread)
         if not saved.next:  # finished (reached WRITE SUMMARY) or never checkpointed
             reason = saved.values.get("stop_reason") if saved.values else "no checkpoint"
             raise ValueError(f"run {run_id} has nothing to resume ({reason})")
         stopped_for = time.time() - datetime.fromisoformat(saved.created_at).timestamp()
         graph.update_state(thread, {"started_at": saved.values["started_at"] + stopped_for})  # option A
-        write_run_start(trace, config, NODES, resumed=True)
+        write_run_start(trace, config, nodes_for(config), resumed=True)
         return graph.invoke(None, thread)
     finally:
         saver.conn.close()

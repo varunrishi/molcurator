@@ -7,10 +7,11 @@ seeds:
   - "N#Cc1ccc(-n2c3ccccc3c3ccccc32)cc1"  # PLACEHOLDER: carbazole-benzonitrile donor-acceptor; replace
 screening:
   margin: 0.15  # xTB-level estimate (e.g. sTDA-xTB) accepted up to 0.35 eV
-qm:
-  backend: orca
-  functional: PBE0  # TD-DFT for S1 and T1
-  basis: def2-SVP
+# Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.
+# qm:
+#   backend: orca
+#   functional: PBE0  # TD-DFT for S1 and T1
+#   basis: def2-SVP
 budget:
   max_rounds: 5
   max_qm_calls: 10  # TD-DFT costs more per molecule than ground-state DFT
