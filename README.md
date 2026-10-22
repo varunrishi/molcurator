@@ -65,7 +65,7 @@ seed molecule + target property
 
 - **Orchestrator**: [LangGraph](https://github.com/langchain-ai/langgraph)
 - **Decision model**: [Claude Haiku 4.5](https://docs.claude.com/) through the Anthropic SDK (~2 s per decision); optionally any OpenAI-compatible endpoint, such as a local model in Ollama
-- **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
+- **Molecular generation**: stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies), checked with [RDKit](https://www.rdkit.org/)
 - **Property prediction (ML)**: [CatBoost](https://catboost.ai/) on Morgan fingerprints and RDKit descriptors by default; a random forest ([scikit-learn](https://scikit-learn.org/)) with `train.model: random_forest`
 - **Semi-empirical**: GFN2-xTB through [tblite](https://github.com/tblite/tblite)'s Python API (no binary)
 - **Quantum chemistry**: [ORCA](https://www.faccts.de/orca/) 6.1.1+, driven from Python by OPI (`orca-pi`)
@@ -150,10 +150,6 @@ On Windows:
 - **Without tblite** (for example a plain `pip install -e .`), GFN2-xTB runs through ORCA's built-in xTB.
 - **Untested**: the conda packages and the code paths exist for Windows, but this setup has not been
   run on a Windows machine yet.
-
-### Optional
-
-- **REINVENT4 (Mol2Mol)**: an alternative generator; install it from https://github.com/MolecularAI/REINVENT4. STONED SELFIES is the default and is installed with the package.
 
 ## Running the agent
 
@@ -386,7 +382,6 @@ assets/          logo and README images
 
 ## References
 
-- Mol2Mol / REINVENT4: https://github.com/MolecularAI/REINVENT4
 - STONED SELFIES: https://github.com/the-matter-lab/stoned-selfies
 - scikit-learn: https://scikit-learn.org/
 
