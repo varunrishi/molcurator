@@ -16,6 +16,7 @@ from molcurator.agent.state import AgentState
 from molcurator.agent.toolset import Toolset
 from molcurator.agent.trace import RecordingDecider, TraceWriter, traced
 from molcurator.config import RunConfig
+from molcurator.tools.curate import export_ml_only
 
 TOOL_STEPS = ["generate", "predict", "train", "ml_predict", "screen", "curate", "close_round"]  # v1 order, QM off
 NODES = ["plan_round", *TOOL_STEPS, "continue_or_stop", "write_summary"]  # for the run_start line (#13)
@@ -24,7 +25,7 @@ NODES = ["plan_round", *TOOL_STEPS, "continue_or_stop", "write_summary"]  # for 
 def initial_state(run_id: str, run_dir: str | Path) -> AgentState:
     """The state a new run starts from: round 1, nothing generated yet. started_at is now (R4.1)."""
     return AgentState(run_id=run_id, run_dir=str(run_dir), round=1, molecules={}, round_plan=None, model=None,
-                      qm_batch=[], dataset_size=0, round_stats=[], stop_reason=None, error=None,
+                      qm_batch=[], dataset_size=0, ml_only_size=0, round_stats=[], stop_reason=None, error=None,
                       started_at=time.time())
 
 
@@ -48,13 +49,16 @@ def continue_or_stop_node(state: AgentState, config: RunConfig, decider: Decider
 
 def write_summary_node(state: AgentState, config: RunConfig, decider: Decider) -> dict:
     """WRITE SUMMARY: the last node of every run, errors included; saves summary.md (R3.4, R1.7).
-    The error route skips CONTINUE OR STOP, so the stop reason is set here before the decider writes."""
+    The error route skips CONTINUE OR STOP, so the stop reason is set here before the decider writes.
+    It also exports the ML-only molecules once, after the last round, to dataset_ml_only.csv."""
     stop_reason = state["stop_reason"] or ("error" if state["error"] else None)
     decided = decider.write_summary({**state, "stop_reason": stop_reason}, config)
     run_dir = Path(state["run_dir"])
     run_dir.mkdir(parents=True, exist_ok=True)  # a run that fails early may not have made it yet
-    (run_dir / "summary.md").write_text(decided.decision.summary + "\n")
-    return {"stop_reason": stop_reason}
+    ml_only = export_ml_only(run_dir)  # from dataset.csv, so it matches whatever was curated
+    (run_dir / "summary.md").write_text(decided.decision.summary +
+                                        f"\n\nML-only molecules: {ml_only} (dataset_ml_only.csv)\n")
+    return {"stop_reason": stop_reason, "ml_only_size": ml_only}
 
 
 def guarded(name: str, node: Callable[[AgentState], dict]) -> Callable[[AgentState], dict]:

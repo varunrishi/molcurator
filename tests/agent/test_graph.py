@@ -1,4 +1,5 @@
 """The v1 graph end to end with FakeTools and the rules, QM off (Phase 2, R1, R4, R10)."""
+import csv
 from pathlib import Path
 
 from molcurator.agent.decisions import RuleDecider
@@ -6,9 +7,15 @@ from molcurator.agent.graph import NODES, build_graph, initial_state
 from molcurator.agent.toolset import Toolset
 from molcurator.agent.trace import TraceWriter, write_run_start
 from molcurator.config import RunConfig, load_config
+from molcurator.tools.curate import curate
 from tests.agent.fakes import FakeTools
 
 CONFIG = Path(__file__).parents[2] / "configs" / "homo_lumo.yaml"  # independent of pytest's working directory
+
+
+class FakeToolsRealCurate(FakeTools):
+    """Fake chemistry, real CURATE: the end-of-run export reads the real dataset.csv."""
+    curate = staticmethod(curate)
 
 
 def run_graph(tmp_path, tools: FakeTools | None = None, n_candidates: int | None = None, **budget) -> dict:
@@ -50,11 +57,17 @@ def test_xtb_sample_trains_model_and_ml_scores_the_rest(tmp_path):
     n = 1000
     xtb = round(0.2 * n)
     assert load_config(CONFIG).predict.n_xtb == xtb  # the fraction rests on the config's n_xtb
-    state = run_graph(tmp_path, n_candidates=n, target_dataset_size=10 * n, max_rounds=2)
+    state = run_graph(tmp_path, tools=FakeToolsRealCurate(), n_candidates=n, target_dataset_size=10 * n, max_rounds=2)
     for s in state["round_stats"]:
         assert (s["generated"], s["xtb_runs"], s["ml_predicted"], s["unscored"]) == (n, xtb, n - xtb, 0)
     assert state["model"]["n_examples"] == 2 * xtb  # refit on both rounds' xTB values
     assert (tmp_path / "models" / "round-2").is_dir()
+    # The end-of-run export holds exactly the curated molecules that have only an ML value
+    ml_only = {m["id"] for m in state["molecules"].values()
+               if m["status"] == "curated" and m["ml"] is not None and m["xtb"] is None}
+    with (tmp_path / "dataset_ml_only.csv").open(newline="") as f:
+        assert {r["id"] for r in csv.DictReader(f)} == ml_only and len(ml_only) == state["ml_only_size"] > 0
+    assert f"ML-only molecules: {len(ml_only)} (dataset_ml_only.csv)" in (tmp_path / "summary.md").read_text()
 
 
 def test_crashed_tool_step_stops_run_and_writes_summary(tmp_path):

@@ -52,3 +52,23 @@ def curate(entries: list[CuratedEntry], run_dir: Path) -> int:
             writer.writeheader()
         writer.writerows(new)
     return len(rows) + len(new)
+
+
+ML_ONLY_COLUMNS = ["id", "smiles", "ml", "parent", "round", "generator", "seeds"]  # the rest is always empty
+
+
+def export_ml_only(run_dir: Path) -> int:
+    """Write dataset_ml_only.csv: the curated molecules that have only an ML value (no xTB, no QM),
+    and return how many. Rebuilt from dataset.csv each time, so it always matches it and can be re-run."""
+    run_dir = Path(run_dir)
+    path = run_dir / "dataset.csv"
+    rows = []
+    if path.exists():  # a run that curated nothing still gets an empty export, with its header
+        with path.open(newline="") as f:
+            rows = list(csv.DictReader(f))
+    ml_only = [r for r in rows if r["ml"] and not r["xtb"] and not r["qm"]]
+    with (run_dir / "dataset_ml_only.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, ML_ONLY_COLUMNS, extrasaction="ignore")  # drop the empty xtb/qm columns
+        writer.writeheader()
+        writer.writerows(ml_only)
+    return len(ml_only)
