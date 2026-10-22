@@ -3,8 +3,8 @@
 The limits below mirror the current tool code. When a tool gains a feature, update the
 matching entry here so the web app stops disabling it:
 
-- targets:      PREDICT/VALIDATE accept only "homo_lumo_gap" in eV
-                (subprojects/property_validation_v1/.../chem/calculations.py)
+- targets:      homo_lumo_gap (xTB PREDICT); s1_t1_gap needs ORCA, for TD-DFT PREDICT and VALIDATE
+                (src/molcurator/tools/predict.py, src/molcurator/chem/backends.py)
 - generators:   GENERATE accepts only "stoned_selfies" (src/molcurator/tools/generate.py)
 - QM backends:  VALIDATE accepts only "orca" (.../tools/validate.py)
 - LLM provider: only "anthropic" is built (src/molcurator/agent/llm.py)
@@ -20,8 +20,8 @@ from .settings import Settings
 
 TARGETS = [
     {"name": "homo_lumo_gap", "label": "HOMO–LUMO gap", "units": "eV", "supported": True, "reason": None},
-    {"name": "s1_t1_gap", "label": "S1–T1 gap (TADF)", "units": "eV", "supported": False,
-     "reason": "PREDICT and VALIDATE compute only HOMO–LUMO gaps in this version."},
+    {"name": "s1_t1_gap", "label": "S1–T1 gap (TADF)", "units": "eV", "supported": True,
+     "reason": "Needs ORCA on the server: PREDICT runs B97-3c TD-DFT, since xTB cannot give S1 or T1."},
 ]
 GENERATORS = [
     {"name": "stoned_selfies", "label": "STONED SELFIES", "supported": True, "reason": None},
@@ -37,11 +37,21 @@ DECISION_MODES = [
      "reason": "Needs ANTHROPIC_API_KEY on the server."},
 ]
 
-# From the repo's own analysis (subprojects/property_validation_v1/reports/local_xtb_validation_20261021/
-# analysis_report.md): B3LYP/def2-SVP minus local GFN2-xTB gap, mean over 60 molecules.
-XTB_OFFSET_NOTE = ("The screen compares raw GFN2-xTB gaps with this window. In the repo's local analysis, "
-                   "B3LYP/def2-SVP gaps were on average 2.55 eV higher than xTB gaps (60 molecules), so xTB "
-                   "values in the window may not be in it at the DFT level.")
+# Shown only for a HOMO-LUMO run without predict.correction, i.e. when the screen sees raw xTB gaps. From the
+# repo's 60 xTB/B3LYP-def2-SVP pairs (data/properties/; scripts/fit_xtb_correction.py): B3LYP is ~2.2 eV higher.
+XTB_OFFSET_NOTE = ("This run compares raw GFN2-xTB gaps with the window, without the xTB-to-DFT correction. "
+                   "B3LYP/def2-SVP gaps are about 2.2 eV higher than xTB ones, so add predict.correction "
+                   "(as in configs/homo_lumo.yaml) to read the window at the DFT level.")
+
+
+def _tblite_version() -> str | None:
+    """tblite's version if it can be imported here, else None."""
+    try:
+        from importlib.metadata import version
+        import tblite  # noqa: F401
+        return version("tblite")
+    except Exception:  # noqa: BLE001 - not installed, or a broken build
+        return None
 
 
 def supported(options: list[dict], name: str) -> bool:
@@ -49,7 +59,7 @@ def supported(options: list[dict], name: str) -> bool:
 
 
 def find_executable(settings: Settings, env_name: str, program: str) -> str | None:
-    """Same lookup order as the tools: the XTB_BIN/ORCA_BIN setting, else the program on PATH."""
+    """Same lookup order as the tools: the ORCA_BIN setting, else the program on PATH."""
     configured = settings.env_value(env_name)
     candidate = configured or shutil.which(program)
     if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
@@ -60,8 +70,10 @@ def find_executable(settings: Settings, env_name: str, program: str) -> str | No
 def tool_status(settings: Settings) -> dict:
     """Readiness of the external programs and keys. "found" means the file exists and is executable;
     it does not prove the program runs (licences, libraries)."""
-    xtb = find_executable(settings, "XTB_BIN", "xtb")
     orca = find_executable(settings, "ORCA_BIN", "orca")
+    # xTB runs in-process through tblite; without it, GFN2-xTB falls back to ORCA's built-in xTB (chem/backends.py)
+    tblite = _tblite_version()
+    xtb = f"tblite {tblite}" if tblite else f"ORCA's built-in xTB ({orca})" if orca else None
     return {
         "xtb": {"found": xtb is not None, "path": xtb},
         "orca": {"found": orca is not None, "path": orca},
@@ -89,7 +101,10 @@ def preflight(config: RunConfig, settings: Settings) -> tuple[list[str], list[st
     if unsupported_generators or not supported(GENERATORS, config.generation.defaults.generator):
         problems.append("Only the stoned_selfies generator is built.")
     if not tools["xtb"]["found"]:
-        problems.append("xTB was not found on the server (set XTB_BIN or put xtb on PATH).")
+        problems.append("xTB is not available on the server: install tblite (pip install tblite), "
+                        "or set ORCA_BIN to use ORCA's built-in xTB.")
+    if config.target.name == "s1_t1_gap" and not tools["orca"]["found"]:
+        problems.append("The S1–T1 gap needs ORCA on the server (set ORCA_BIN): xTB cannot give S1 or T1.")
     if config.qm.enabled:
         if not supported(QM_BACKENDS, config.qm.backend):
             problems.append(f"QM backend '{config.qm.backend}' is not built yet; use orca.")
@@ -102,8 +117,9 @@ def preflight(config: RunConfig, settings: Settings) -> tuple[list[str], list[st
             problems.append("Only the anthropic LLM provider is built.")
 
     if not config.qm.enabled:
-        warnings.append("QM is off: curated molecules will be xTB or ML estimates, not QM-confirmed hits.")
-    if config.target.name == "homo_lumo_gap":
+        warnings.append("QM validation is switched off: curated molecules will be xTB or ML estimates, "
+                        "not QM-confirmed hits.")
+    if config.target.name == "homo_lumo_gap" and config.predict.correction is None:
         warnings.append(XTB_OFFSET_NOTE)
     xtb_per_round = min(config.predict.n_xtb, config.generation.defaults.n_candidates)
     if config.train.min_examples > xtb_per_round * config.budget.max_rounds:

@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]  # app/server/tests/fake_agent.py -> repo root
+REPO = Path(__file__).resolve().parents[2]  # tests/server/fake_agent.py -> repo root
 sys.path.insert(0, str(REPO / "tests" / "agent"))
 
 from fakes import FakeTools  # noqa: E402

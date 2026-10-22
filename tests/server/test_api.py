@@ -4,7 +4,7 @@ import json
 import time
 import zipfile
 
-from conftest import TOKEN, small_config, wait_for
+from tests.server.conftest import TOKEN, small_config, wait_for
 
 
 # ------------------------------------------------------------------ system
@@ -26,13 +26,13 @@ def test_system_reports_tools_and_capabilities(client):
     assert body["tools"]["orca"]["found"] is False
     assert "value" not in json.dumps(body["tools"]["anthropic_key"])  # the key itself is never returned
     targets = {t["name"]: t["supported"] for t in body["capabilities"]["targets"]}
-    assert targets == {"homo_lumo_gap": True, "s1_t1_gap": False}
+    assert targets == {"homo_lumo_gap": True, "s1_t1_gap": True}  # S1-T1: TD-DFT through ORCA (#37)
 
 
-def test_presets_mark_tadf_unsupported(client):
+def test_presets_are_offered(client):
     presets = {p["name"]: p for p in client.get("/api/presets").json()}
     assert presets["homo_lumo"]["supported"] is True
-    assert presets["tadf"]["supported"] is False
+    assert presets["tadf"]["supported"] is True  # runs need ORCA: see preflight
     assert presets["homo_lumo"]["notes"]  # the shipped seed is marked PLACEHOLDER
 
 
@@ -41,11 +41,17 @@ def test_validate_reports_problems_and_warnings(client):
     assert bad["valid"] is False and any("target" in p for p in bad["problems"])
 
     tadf = client.post("/api/config/validate", json={"config": small_config(target={"name": "s1_t1_gap", "max": 0.2})}).json()
-    assert tadf["valid"] is False and any("not supported" in p for p in tadf["problems"])
+    assert tadf["valid"] is False and any("needs ORCA" in p for p in tadf["problems"])  # no ORCA on this server
 
     ok = client.post("/api/config/validate", json={"config": small_config()}).json()
     assert ok["valid"] is True and ok["problems"] == []
-    assert any("QM is off" in w for w in ok["warnings"])
+    assert any("QM validation is switched off" in w for w in ok["warnings"])
+    assert any("raw GFN2-xTB" in w for w in ok["warnings"])  # no predict.correction: the offset note
+    correction = {"slope": 0.6915, "intercept": 3.2347, "residual_sd": 0.455, "xtb_range": [1.02, 8.84],
+                  "fitted_on": "60 pairs"}
+    corrected = client.post("/api/config/validate",
+                            json={"config": small_config(predict={"n_xtb": 4, "correction": correction})}).json()
+    assert corrected["valid"] is True and not any("raw GFN2-xTB" in w for w in corrected["warnings"])
 
 
 def test_inspect_flags_what_the_tools_reject(client):
@@ -156,7 +162,8 @@ def test_web_app_is_served_at_root(client):
 
 def test_stop_kills_a_run_that_ignores_ctrl_c_and_its_helpers(client, settings, monkeypatch):
     import os
-    from molcurator_api import run_manager
+    import subprocess
+    from server import run_manager
     monkeypatch.setattr(run_manager, "STOP_GRACE_SECONDS", 1)
     monkeypatch.setenv("FAKE_AGENT_STUBBORN", "1")
     assert client.post("/api/runs", json={"config": small_config(), "run_id": "t-stubborn"}).status_code == 202
@@ -171,7 +178,8 @@ def test_stop_kills_a_run_that_ignores_ctrl_c_and_its_helpers(client, settings, 
     time.sleep(0.5)
     try:
         os.kill(helper, 0)
-        alive = open(f"/proc/{helper}/stat").read().split()[2] != "Z"  # a zombie is already dead
+        state = subprocess.run(["ps", "-o", "stat=", "-p", str(helper)], capture_output=True, text=True).stdout
+        alive = bool(state.strip()) and not state.strip().startswith("Z")  # a zombie is already dead (Linux, macOS)
     except ProcessLookupError:
         alive = False
     assert not alive

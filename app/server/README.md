@@ -51,7 +51,7 @@ Environment variables or the repo's `.env`; the full table is in
 [`docs/api/README.md`](../../docs/api/README.md#server-settings). The important ones:
 
 - `MOLCURATOR_API_TOKEN`: the API token. If unset, a new one is printed at each start.
-- `XTB_BIN` (and `ORCA_BIN` for QM): as for the agent without the API.
+- `ORCA_BIN`: ORCA 6.1.1+, for QM validation and S1–T1 targets. xTB needs no setting: it runs through tblite.
 - `MOLCURATOR_MAX_RUNS`: how many runs may run at once (default 1).
 
 ## Tests

@@ -13,13 +13,18 @@ def inspect_smiles(smiles: str, with_xyz: bool = True) -> dict:
     if mol is None or mol.GetNumAtoms() == 0:
         return {"valid": False, "canonical": None, "problems": ["Not a valid SMILES."], "xyz": None}
 
-    problems = []  # what the property tools reject (iteration 1: neutral, closed-shell, one fragment)
+    # Shown as notes, not blocks. PREDICT computes charged and open-shell molecules (it reads charge and
+    # multiplicity), but the ML model learns only neutral closed-shell ones and GENERATE rejects radicals.
+    problems = []
     if Chem.GetFormalCharge(mol) != 0:
-        problems.append("Charged molecule: PREDICT supports neutral molecules only.")
+        problems.append("Charged molecule: xTB handles it, but the ML model learns only from neutral "
+                        "molecules, so charged candidates get no ML estimate.")
     if Descriptors.NumRadicalElectrons(mol) > 0:
-        problems.append("Radical: PREDICT supports closed-shell molecules only.")
+        problems.append("Radical: xTB handles it, but GENERATE rejects radical candidates and the ML model "
+                        "learns only from closed-shell molecules.")
     if len(Chem.GetMolFrags(mol)) > 1:
-        problems.append("More than one fragment: PREDICT needs one connected molecule.")
+        problems.append("More than one fragment: PREDICT needs one connected molecule, so its children "
+                        "will likely fail in xTB.")
 
     return {
         "valid": True,

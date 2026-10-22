@@ -1,5 +1,5 @@
 """Shared fixtures: an API app wired to a temporary runs folder and the fake agent."""
-import stat
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -7,29 +7,28 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-SERVER = Path(__file__).resolve().parents[1]  # app/server
-REPO = SERVER.parents[1]
-sys.path.insert(0, str(SERVER))
+HERE = Path(__file__).resolve().parent  # tests/server
+REPO = HERE.parents[1]
+sys.path.insert(0, str(REPO / "app"))  # the `server` package, imported as scripts/run.sh does (--app-dir app)
 
-from molcurator_api.main import create_app  # noqa: E402
-from molcurator_api.settings import Settings  # noqa: E402
+from server.main import create_app  # noqa: E402
+from server.settings import Settings  # noqa: E402
 
 TOKEN = "test-token"
 
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch) -> Settings:
-    fake_xtb = tmp_path / "bin" / "xtb"  # preflight only checks that xTB exists; the fake agent never calls it
-    fake_xtb.parent.mkdir()
-    fake_xtb.write_text("#!/bin/sh\nexit 0\n")
-    fake_xtb.chmod(fake_xtb.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setenv("XTB_BIN", str(fake_xtb))
+    # xTB is found through tblite, a dependency; the fake agent never calls it
     monkeypatch.delenv("ORCA_BIN", raising=False)
+    # "no ORCA on this server" whatever this machine has on PATH, so results do not depend on it
+    which = shutil.which
+    monkeypatch.setattr(shutil, "which", lambda name, *a, **k: None if name == "orca" else which(name, *a, **k))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     return Settings(repo=REPO, runs_root=tmp_path / "runs", web_dir=REPO / "app" / "web", api_token=TOKEN,
                     token_was_generated=False, max_runs=1, cors_origins=["*"],
                     repo_url="https://example.invalid/molcurator",
-                    agent_cmd=[sys.executable, str(SERVER / "tests" / "fake_agent.py")])
+                    agent_cmd=[sys.executable, str(HERE / "fake_agent.py")])
 
 
 @pytest.fixture

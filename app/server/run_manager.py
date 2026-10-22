@@ -191,14 +191,19 @@ class RunManager:
 
 
 def descendants(pid: int) -> list[int]:
-    """All processes started (directly or not) by pid, read from /proc (Linux); [] elsewhere."""
+    """All processes started (directly or not) by pid, from `ps` (Linux and macOS; [] where there is none).
+    /proc alone would miss them on macOS, where a stopped run then left its ORCA jobs running."""
+    try:
+        table = subprocess.run(["ps", "-A", "-o", "pid=,ppid="], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
     children: dict[int, list[int]] = {}
-    for stat in Path("/proc").glob("[0-9]*/stat"):
+    for line in table.splitlines():
         try:
-            fields = stat.read_text().rsplit(")", 1)[1].split()  # after "(name)": state, ppid, ...
-            children.setdefault(int(fields[1]), []).append(int(stat.parent.name))
-        except (OSError, IndexError, ValueError):
+            child, parent = map(int, line.split())
+        except ValueError:
             continue
+        children.setdefault(parent, []).append(child)
     found, todo = [], [pid]
     while todo:
         for child in children.get(todo.pop(), []):
