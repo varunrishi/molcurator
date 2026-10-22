@@ -19,8 +19,8 @@ A running server also serves interactive documentation at `/api/docs` (Swagger U
 ## Quick start
 
 ```bash
-./run.sh --install           # first time: install fastapi + uvicorn (and molcurator if missing)
-./run.sh                     # http://127.0.0.1:8000, prints an API token
+scripts/run.sh --install           # first time: install the project (uv sync, or pip install -e .)
+scripts/run.sh                     # http://127.0.0.1:8000, prints an API token
 ```
 
 ```bash
@@ -28,7 +28,7 @@ TOKEN=...                    # the token printed at startup
 curl -s http://127.0.0.1:8000/api/health
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/system
 curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"config": {"target": {"name": "homo_lumo_gap", "min": 3.0, "max": 3.5},
+  -d '{"config": {"target": {"name": "homo_lumo_gap", "min": 4.0, "max": 4.5},
                   "seeds": ["c1ccc(-c2cccs2)s1"], "decisions": "rules"}}' \
   http://127.0.0.1:8000/api/runs
 ```
@@ -42,7 +42,8 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   authentication off (only for a machine nobody else can reach).
 - **CORS:** allowed for every origin by default (`MOLCURATOR_CORS_ORIGINS`), so the web app can
   be opened from another address. The token, not cookies, protects the API.
-- **Units:** property values are in the target's units; for `homo_lumo_gap` that is eV.
+- **Units:** property values are in the target's units (`target.units`, e.g. eV for
+  `homo_lumo_gap`, Eh for `energy`, debye for `dipole_moment`).
 - **Ids:** run and molecule ids match `^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`.
 - **Errors:** `{"detail": "<message>"}`, or for a config that cannot run
   `{"detail": {"message": "...", "problems": ["...", "..."]}}`.
@@ -53,7 +54,7 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 | 401 | missing or wrong token |
 | 404 | no such run, file or geometry |
 | 409 | not possible in the run's current state (already running, run limit reached, not resumable) |
-| 422 | invalid config, or the server cannot run it (e.g. xTB or ORCA missing, unsupported target) |
+| 422 | invalid config, or the server cannot run it (e.g. ORCA missing for QM or for a target only ORCA computes) |
 
 Per-molecule failures are never HTTP errors: they are molecules with `status: "failed"` and an
 `error` text.
@@ -95,13 +96,13 @@ reported separately as `current.node` (derived from the graph order).
 ## How far to trust a value
 
 Each molecule has values at up to three levels. `best_value` / `best_level` is the most
-accurate one it has (QM, else xTB, else ML), which is also what CURATE uses.
+accurate one it has (QM, else PREDICT, else ML), which is also what CURATE uses.
 
 | Level | Method | Caution |
 |---|---|---|
-| `qm` | DFT single point with ORCA (e.g. B3LYP/def2-SVP) | the level a target window is meant for |
-| `xtb` | GFN2-xTB single point on an MMFF94 geometry | systematically offset from DFT: in the repo's local analysis (`subprojects/property_validation_v1/reports/local_xtb_validation_20261021/analysis_report.md`), B3LYP/def2-SVP gaps were on average 2.55 eV higher than xTB gaps (60 molecules) |
-| `ml` | model trained on xTB values | the README reports a test MAE of about 0.5 eV; a candidate to check, not a result |
+| `qm` | DFT with ORCA (e.g. B3LYP/def2-SVP) | the level a target window is meant for |
+| `xtb` | PREDICT on an MMFF94 geometry: GFN2-xTB (tblite) where xTB can give the property, else B97-3c through ORCA; the run's `predict_level` says which | for `homo_lumo_gap`, raw xTB gaps sit well below DFT gaps; `configs/homo_lumo.yaml` corrects them to DFT-like values with a linear fit (60 xTB/B3LYP/def2-SVP pairs, residual SD 0.455 eV), and `xtb_raw` keeps the uncorrected value |
+| `ml` | model trained on PREDICT values | the README reports a test MAE of about 0.5 eV (HOMO–LUMO gap); a candidate to check, not a result |
 
 `validated: true` only when QM confirmed the molecule.
 
@@ -109,14 +110,19 @@ accurate one it has (QM, else xTB, else ML), which is also what CURATE uses.
 
 `GET /api/system` reports what is installed and what this version supports. In this version:
 
-- target: `homo_lumo_gap` only (`s1_t1_gap`/TADF is rejected: the tools do not compute it);
+- targets: every single-number property the tools compute (`energy`, `homo_lumo_gap`,
+  `dipole_moment`, `polarizability`, `g_tensor`, `s1_energy`, `t1_energy`, `s1_t1_gap`,
+  `s0_t1_gap`, `ionization_potential`, `electron_affinity`, `thermochemistry`); those xTB
+  cannot give (e.g. `s1_t1_gap`) need ORCA for PREDICT;
 - generator: `stoned_selfies` only;
 - QM backend: `orca` only (PySCF is not built), and only if ORCA is found;
 - decisions: `rules`, or `llm` when `ANTHROPIC_API_KEY` is set on the server;
+- the agent view's prompt-to-run assistant (`POST /api/assistant/plan`) when `ANTHROPIC_API_KEY` is set;
 - no human approval before QM yet.
 
-"Found" for xTB and ORCA means the file exists and is executable; it does not prove the
-program runs (licence, libraries).
+xTB is available when tblite imports (else through ORCA's built-in xTB). "Found" for ORCA means
+an executable file (`ORCA_BIN`, `OPI_ORCA`, OPI's config file or `PATH`); it does not prove
+ORCA runs (licence, Open MPI).
 
 ## Server settings
 
@@ -126,13 +132,13 @@ Environment variables, or the repo's `.env` file (environment wins):
 |---|---|---|
 | `MOLCURATOR_API_TOKEN` | new random token at each start | API token |
 | `MOLCURATOR_NO_AUTH` | `0` | `1` disables authentication |
-| `MOLCURATOR_HOST`, `MOLCURATOR_PORT` | `127.0.0.1`, `8000` | address `run.sh` listens on |
+| `MOLCURATOR_HOST`, `MOLCURATOR_PORT` | `127.0.0.1`, `8000` | address `scripts/run.sh` listens on |
 | `MOLCURATOR_RUNS_ROOT` | `data/runs` | where run folders go |
 | `MOLCURATOR_MAX_RUNS` | `1` | runs allowed at the same time |
 | `MOLCURATOR_CORS_ORIGINS` | `*` | comma-separated allowed origins |
 | `MOLCURATOR_WEB_DIR` | `app/web` | web app served at `/` |
 | `MOLCURATOR_REPO_URL` | `https://github.com/varunrishi/molcurator` | "Source code" link |
-| `XTB_BIN`, `ORCA_BIN`, `ANTHROPIC_API_KEY` | — | read by the agent, as without the API |
+| `ORCA_BIN`, `OPENMPI_HOME`, `ANTHROPIC_API_KEY`, `LLM_MODEL` | — | read by the agent, as without the API; `ANTHROPIC_API_KEY` also enables the agent view |
 
 ## Files kept by the API
 

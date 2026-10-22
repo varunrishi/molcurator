@@ -15,9 +15,9 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]  # tests/server/fake_agent.py -> repo root
-sys.path.insert(0, str(REPO / "tests" / "agent"))
+sys.path.insert(0, str(REPO))
 
-from fakes import FakeTools  # noqa: E402
+from tests.agent.fakes import FakeTools  # noqa: E402
 
 from molcurator.agent.runner import resume_agent, run_agent  # noqa: E402
 from molcurator.agent.toolset import Toolset  # noqa: E402

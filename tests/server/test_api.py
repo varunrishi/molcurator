@@ -4,7 +4,9 @@ import json
 import time
 import zipfile
 
-from tests.server.conftest import TOKEN, small_config, wait_for
+from molcurator.chem.properties import SCALAR_PROPERTIES
+
+from tests.server.helpers import TOKEN, small_config, wait_for
 
 
 # ------------------------------------------------------------------ system
@@ -25,14 +27,22 @@ def test_system_reports_tools_and_capabilities(client):
     assert body["tools"]["xtb"]["found"] is True
     assert body["tools"]["orca"]["found"] is False
     assert "value" not in json.dumps(body["tools"]["anthropic_key"])  # the key itself is never returned
-    targets = {t["name"]: t["supported"] for t in body["capabilities"]["targets"]}
-    assert targets == {"homo_lumo_gap": True, "s1_t1_gap": True}  # S1-T1: TD-DFT through ORCA (#37)
+    targets = {t["name"]: t for t in body["capabilities"]["targets"]}
+    assert set(targets) == set(SCALAR_PROPERTIES)                   # read from the agent's own list
+    assert targets["homo_lumo_gap"]["units"] == "eV" and targets["homo_lumo_gap"]["predict_method"] == "GFN2-xTB"
+    assert targets["s1_t1_gap"]["needs_orca"] is True and targets["s1_t1_gap"]["predict_method"] == "B97-3c"
 
 
-def test_presets_are_offered(client):
+def test_system_finds_orca_from_orca_bin(client, fake_orca):
+    orca = client.get("/api/system").json()["tools"]["orca"]
+    assert orca["found"] is True and orca["source"] == "ORCA_BIN" and orca["path"] == str(fake_orca.resolve())
+
+
+def test_presets_describe_their_predict_level(client):
     presets = {p["name"]: p for p in client.get("/api/presets").json()}
-    assert presets["homo_lumo"]["supported"] is True
-    assert presets["tadf"]["supported"] is True  # runs need ORCA: see preflight
+    assert presets["homo_lumo"]["predict_level"]["label"] == "GFN2-xTB corrected to DFT-like"
+    assert presets["tadf"]["predict_level"]["method"] == "B97-3c"
+    assert any("ORCA" in n for n in presets["tadf"]["notes"])       # no ORCA in this test
     assert len(presets["homo_lumo"]["config"]["seeds"]) == 10  # read from data/seeds/homo_lumo.csv (seeds_file)
     assert not presets["homo_lumo"]["notes"] and presets["tadf"]["notes"]  # only tadf's seed is a PLACEHOLDER
 
@@ -42,7 +52,10 @@ def test_validate_reports_problems_and_warnings(client):
     assert bad["valid"] is False and any("target" in p for p in bad["problems"])
 
     tadf = client.post("/api/config/validate", json={"config": small_config(target={"name": "s1_t1_gap", "max": 0.2})}).json()
-    assert tadf["valid"] is False and any("needs ORCA" in p for p in tadf["problems"])  # no ORCA on this server
+    assert tadf["valid"] is False and any("needs ORCA" in p for p in tadf["problems"])
+
+    unknown = client.post("/api/config/validate", json={"config": small_config(target={"name": "solubility", "max": 1})}).json()
+    assert unknown["valid"] is False and any("not a single-number property" in p for p in unknown["problems"])
 
     ok = client.post("/api/config/validate", json={"config": small_config()}).json()
     assert ok["valid"] is True and ok["problems"] == []
@@ -184,3 +197,15 @@ def test_stop_kills_a_run_that_ignores_ctrl_c_and_its_helpers(client, settings, 
     except ProcessLookupError:
         alive = False
     assert not alive
+
+
+def test_raw_xtb_values_are_shown_for_corrected_runs(client):
+    correction = {"slope": 0.5, "intercept": 3.0, "residual_sd": 0.4, "xtb_range": [1.0, 2.0], "fitted_on": "test"}
+    config = small_config(predict={"n_xtb": 4, "correction": correction}, budget={"max_rounds": 1, "target_dataset_size": 1000})
+    assert client.post("/api/runs", json={"config": config, "run_id": "corrected"}).status_code == 202
+    assert wait_for(client, "corrected", {"finished"})["predict_level"]["corrected"] is True
+    predicted = [m for m in client.get("/api/runs/corrected/molecules").json() if m["xtb"] is not None]
+    assert predicted
+    for m in predicted:
+        assert abs(0.5 * m["xtb_raw"] + 3.0 - m["xtb"]) < 1e-9
+        assert m["xtb_extrapolated"] == (not 1.0 <= m["xtb_raw"] <= 2.0)

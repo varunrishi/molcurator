@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from server.main import create_app
 from server.settings import default_agent_cmd
-from tests.server.conftest import TOKEN, small_config, wait_for
+from tests.server.helpers import TOKEN, small_config, wait_for
 
 pytestmark = pytest.mark.skipif(importlib.util.find_spec("tblite") is None, reason="tblite not installed")
 

@@ -14,13 +14,13 @@
   const CARD_PAGE = 120; // cards drawn at once; "Show more" adds the next page
 
   const NODE_LABEL = {
-    plan_round: "Plan round", generate: "Generate", predict: "xTB", train: "Train ML", ml_predict: "ML estimate",
+    plan_round: "Plan round", generate: "Generate", predict: "Predict", train: "Train ML", ml_predict: "ML estimate",
     screen: "Screen", select_qm_batch: "Pick QM batch", validate: "QM", curate: "Curate",
     close_round: "Close round", continue_or_stop: "Continue?", write_summary: "Summary", run_start: "Start"
   };
   const SKIP_REASON = {
-    below_min_examples: "not enough xTB values yet to train the model",
-    no_candidates_left: "every candidate already has an xTB value",
+    below_min_examples: "not enough PREDICT values yet to train the model",
+    no_candidates_left: "every candidate already has a PREDICT value",
     empty_qm_batch: "no candidates were selected for QM"
   };
   const STOP_REASON = {
@@ -140,7 +140,9 @@
     const parts = [];
     if (t) parts.push(`${esc(t.name)} ${t.min ?? "…"}–${t.max ?? "…"} ${esc(t.units || "")}`);
     if (o.decisions) parts.push(o.decisions === "llm" ? "LLM decisions" : "rule decisions");
+    if (o.predict_level) parts.push("PREDICT " + esc(o.predict_level.label));
     parts.push(o.qm_enabled ? "QM on" : "QM off");
+    $("legendPredict").textContent = levelLabel("xtb") === "xTB→DFT" ? "xTB → DFT-like" : levelLabel("xtb");
     if (o.started_at) parts.push("started " + clock(o.started_at));
     parts.push("running time " + duration(o.running_seconds));
     $("runMeta").innerHTML = parts.join(" · ");
@@ -210,13 +212,13 @@
     }
     if (e.node === "train" && out.model) {
       const m = out.model.metrics || {};
-      let s = `trained on ${out.model.n_examples} xTB values`;
-      if (m.test_mae != null) s += ` · test MAE ${fmt(m.test_mae)} eV` + (m.baseline_mae != null ? ` (guessing the mean: ${fmt(m.baseline_mae)})` : "");
+      let s = `trained on ${out.model.n_examples} PREDICT values`;
+      if (m.test_mae != null) s += ` · test MAE ${fmt(m.test_mae)} ${esc(units())}` + (m.baseline_mae != null ? ` (guessing the mean: ${fmt(m.baseline_mae)})` : "");
       return s;
     }
     if (e.node === "close_round" && out.round_stats) {
       const s = out.round_stats;
-      return `${s.generated} generated · ${s.xtb_runs} xTB · ${s.ml_predicted} ML · ${s.screened_in} screened in · ${s.qm_calls} QM · ${s.hits} curated`;
+      return `${s.generated} generated · ${s.xtb_runs} predicted · ${s.ml_predicted} ML · ${s.screened_in} screened in · ${s.qm_calls} QM · ${s.hits} curated`;
     }
     if (e.node === "continue_or_stop") return out.stop_reason ? "Stop: " + (STOP_REASON[out.stop_reason] || out.stop_reason) : "Continue to round " + out.round;
     if (e.node === "write_summary") return "Summary written" + (out.stop_reason ? " · " + (STOP_REASON[out.stop_reason] || out.stop_reason) : "");
@@ -252,7 +254,7 @@
 
   function renderRounds() {
     const rows = state.overview.rounds || [];
-    const cols = [["round", "Round"], ["generated", "Generated"], ["duplicates", "Repeats"], ["xtb_runs", "xTB"],
+    const cols = [["round", "Round"], ["generated", "Generated"], ["duplicates", "Repeats"], ["xtb_runs", "Predicted"],
                   ["ml_predicted", "ML"], ["unscored", "Unscored"], ["failed", "Failed"], ["screened_in", "Screened in"],
                   ["selected", "To QM"], ["qm_calls", "QM calls"], ["hits", "Curated"]];
     $("roundsTable").innerHTML = rows.length
@@ -276,6 +278,21 @@
 
   // ------------------------------------------------------------------ rendering: molecules
   const LEVEL_LABEL = { qm: "QM", xtb: "xTB", ml: "ML" };
+
+  // The run's units and PREDICT level (GET /api/runs/<id>: target, predict_level). PREDICT values
+  // sit in the "xtb" field whatever method ran, so their badge names the method.
+  function units() {
+    const t = state.overview && state.overview.target;
+    return t ? t.units || "" : "";
+  }
+  function predictLevel() {
+    return (state.overview && state.overview.predict_level) || { method: "PREDICT", label: "PREDICT", xtb: true, corrected: false };
+  }
+  function levelLabel(level) {
+    if (level !== "xtb") return LEVEL_LABEL[level];
+    const p = predictLevel();
+    return p.xtb ? (p.corrected ? "xTB→DFT" : "xTB") : p.method;
+  }
 
   function distanceToWindow(m) {
     const t = state.overview.target || {};
@@ -331,7 +348,7 @@
     const value = m.status === "failed"
       ? '<span class="failtext">failed</span>'
       : m.best_value == null ? '<span class="note">no value</span>'
-      : `<span class="gap">${fmt(m.best_value)}<span class="u">eV</span></span><span class="lvbadge ${m.best_level}">${LEVEL_LABEL[m.best_level]}</span>`;
+      : `<span class="gap">${fmt(m.best_value)}<span class="u">${esc(units())}</span></span><span class="lvbadge ${m.best_level}">${esc(levelLabel(m.best_level))}</span>`;
     return `<button class="card${m.curated ? " hit" : ""}" data-mol="${esc(m.id)}">${badge}` +
       `<div class="depict">${chem.depictSVG(m.smiles, 150, 96) || '<span class="note">no drawing</span>'}</div>` +
       `<div class="cid">${esc(m.id)}</div><div class="valrow">${value}</div></button>`;
@@ -352,9 +369,9 @@
     let html = `<div class="window" style="left:${winLo}%;width:${winHi - winLo}%"></div>`;
     vals.forEach((m, i) => {
       const y = 15 + ((i * 37) % 60); // spread points vertically so they do not hide each other
-      html += `<div class="pt ${m.best_level}${m.curated ? " cur" : ""}" style="left:${x(m.best_value)}%;top:${y}%" title="${esc(m.id)}: ${fmt(m.best_value)} eV (${LEVEL_LABEL[m.best_level]})"></div>`;
+      html += `<div class="pt ${m.best_level}${m.curated ? " cur" : ""}" style="left:${x(m.best_value)}%;top:${y}%" title="${esc(m.id)}: ${fmt(m.best_value)} ${esc(units())} (${esc(levelLabel(m.best_level))})"></div>`;
     });
-    html += `<div class="axis"><span>${fmt(lo, 1)}</span><span>${esc(t.units || "eV")}</span><span>${fmt(hi, 1)}</span></div>`;
+    html += `<div class="axis"><span>${fmt(lo, 1)}</span><span>${esc(t.units || "")}</span><span>${fmt(hi, 1)}</span></div>`;
     box.innerHTML = html;
   }
 
@@ -367,7 +384,8 @@
     badge.className = "chip" + (m.status === "failed" ? " bad" : m.curated ? " in" : "");
     badge.textContent = m.status === "failed" ? "failed" : m.curated ? (m.validated ? "QM-validated hit" : "curated") : (m.status || "").replace(/_/g, " ");
     const row = (k, v) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`;
-    const val = (v) => (v == null ? "—" : fmt(v, 3) + " eV");
+    const val = (v) => (v == null ? "—" : fmt(v, 3) + " " + esc(units()));
+    const p = predictLevel();
     const win = state.overview.target || {};
     $("sheetBody").innerHTML =
       `<div class="detail-depict">${chem.depictSVG(m.smiles, 420, 170) || '<span class="note">no drawing</span>'}</div>` +
@@ -377,16 +395,19 @@
       '<button class="btn sm primary" id="dSeed">Use as seed</button></div>' +
       `<div class="kv"><span class="k">SMILES</span><span class="v">${esc(m.smiles || "—")}</span></div>` +
       '<table class="proptable">' +
-      row("Best estimate", m.best_value == null ? "—" : `${fmt(m.best_value, 3)} eV <span class="lvbadge ${m.best_level}">${LEVEL_LABEL[m.best_level]}</span>`) +
-      row("Target window", `${win.min ?? "…"} – ${win.max ?? "…"} eV`) +
+      row("Best estimate", m.best_value == null ? "—" : `${val(m.best_value)} <span class="lvbadge ${m.best_level}">${esc(levelLabel(m.best_level))}</span>`) +
+      row("Target window", `${win.min ?? "…"} – ${win.max ?? "…"} ${esc(units())}`) +
       row("In window", m.in_window == null ? "—" : m.in_window ? "yes" : "no") +
-      row("xTB (GFN2)", val(m.xtb)) + row("ML estimate", val(m.ml)) +
+      row(`PREDICT (${esc(p.label)})`, val(m.xtb)) +
+      (p.corrected && m.xtb_raw != null ? row("xTB before correction", val(m.xtb_raw) +
+        (m.xtb_extrapolated ? ' <span class="note">outside the range the correction was fitted on: extrapolated</span>' : "")) : "") +
+      row("ML estimate", val(m.ml)) +
       row("QM" + (m.qm_method ? " (" + esc(m.qm_method) + ")" : ""), val(m.qm)) +
       row("Curated", m.curated ? (m.validated ? "yes, QM-validated" : "yes, not QM-validated") : "no") +
       row("Round", esc(m.round ?? "—")) + row("Parent", `<span class="mono">${esc(m.parent || "—")}</span>`) +
       (m.error ? row("Error", esc(m.error)) : "") + "</table>" +
       (m.best_level === "ml" ? '<p class="note">Only an ML estimate: treat it as a candidate to check, not a result.</p>' : "") +
-      (m.best_level === "xtb" ? '<p class="note">xTB value only: not confirmed by QM.</p>' : "");
+      (m.best_level === "xtb" ? `<p class="note">${esc(p.label)} value only: not confirmed by QM.</p>` : "");
     $("overlay").classList.add("open");
 
     let xyz = null;
@@ -394,7 +415,7 @@
       api.xyz(state.runId, m.id).then((text) => { xyz = text; viewer.render("detail3d", text); })
         .catch(() => viewer.clear("detail3d", "Could not load the geometry"));
     } else {
-      viewer.clear("detail3d", "No geometry: this molecule had no xTB calculation");
+      viewer.clear("detail3d", "No geometry: this molecule had no PREDICT calculation");
     }
     $("dCopy").onclick = () => copy(m.smiles, "SMILES copied");
     $("dXyz").onclick = () => (xyz ? saveBlob(new Blob([xyz], { type: "chemical/x-xyz" }), m.id + ".xyz") : toast("No geometry for this molecule"));
@@ -478,5 +499,6 @@
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
   }
 
-  MOL.monitor = { init: bind, refreshList: refreshList, select: select };
+  MOL.monitor = { init: bind, refreshList: refreshList, select: select, selected: () => state.runId,
+                  librariesReady: () => { if (state.overview) renderMolecules(); } };
 })();

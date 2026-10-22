@@ -3,15 +3,16 @@
 ## On your own machine
 
 ```bash
-scripts/setup.sh             # once: Python environment (.venv), xtb, .env
-./run.sh --install           # once: the API server's packages (fastapi, uvicorn)
-./run.sh                     # http://127.0.0.1:8000
+scripts/setup.sh             # once: Python environment (.venv, includes xTB via tblite), .env
+scripts/run.sh --install           # once, if setup.sh was not run: install the project
+scripts/run.sh                     # http://127.0.0.1:8000
 ```
 
-Open http://127.0.0.1:8000, click the connection pill (or the gear) and paste the API token
-`run.sh` printed. Set `MOLCURATOR_API_TOKEN` in `.env` to keep the same token across restarts.
+Open http://127.0.0.1:8000: the app asks for the server address (leave it empty here) and the
+API token `scripts/run.sh` printed, then opens the agent view (or the dashboard when the server
+has no `ANTHROPIC_API_KEY`). Set `MOLCURATOR_API_TOKEN` in `.env` to keep the same token across restarts.
 
-`./run.sh --help` lists the options (`--host`, `--port`, `--install`). By default the server
+`scripts/run.sh --help` lists the options (`--host`, `--port`, `--install`). By default the server
 listens on 127.0.0.1 only.
 
 ## Sharing it for testing (tunnel)
@@ -44,8 +45,11 @@ Things to know:
 - The session is temporary. Download each run (web app: **Download → Whole run**, or the
   archive endpoint) before it ends; files under `/kaggle/working` are kept only if you save a
   notebook version.
-- ORCA is not installed there (licence), so runs use xTB (and ML) only: QM is off.
-- A CPU session is enough; xTB does not use a GPU.
+- xTB comes with the Python packages (tblite). ORCA is licensed and not downloaded: without
+  it, runs use xTB (and ML) only, QM is off, and targets whose PREDICT needs ORCA (e.g.
+  `s1_t1_gap`) cannot run. To use your own licensed ORCA, add it as a **private** Kaggle
+  Dataset and set `ORCA_DIR` in the notebook's settings cell.
+- A CPU session is enough; neither xTB nor ORCA uses a GPU.
 
 ## Security checklist
 

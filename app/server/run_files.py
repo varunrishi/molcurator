@@ -18,6 +18,7 @@ from .settings import Settings
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # run ids and molecule ids; no "/" or ".."
 
 # Tool nodes record one [id, status, value-or-error] entry per molecule; this is what the value means.
+# PREDICT values sit in the "xtb" field (as in dataset.csv) whatever method PREDICT ran: see predict_level.
 VALUE_FIELD = {"generate": "smiles", "predict": "xtb", "ml_predict": "ml", "validate": "qm"}
 DOWNLOADS = {  # file name in the API -> path inside the run folder
     "dataset.csv": "dataset.csv",
@@ -145,14 +146,31 @@ def dataset_rows(path: Path) -> list[dict]:
     with file.open(newline="") as f:
         rows = list(csv.DictReader(f))
     for row in rows:
-        for key in ("ml", "xtb", "qm"):
+        for key in ("ml", "xtb", "xtb_raw", "qm"):
             row[key] = float(row[key]) if row.get(key) not in (None, "") else None
+        row["xtb_extrapolated"] = str(row.get("xtb_extrapolated")).lower() == "true"
         row["round"] = int(row["round"]) if row.get("round") else None
         row["validated"] = str(row.get("validated")).lower() == "true"
         for key, value in list(row.items()):
             if value == "":
                 row[key] = None
     return rows
+
+
+def predict_level(config: dict) -> dict:
+    """What PREDICT computed in this run (from its saved config): method and whether xTB values
+    were corrected to DFT-like ones. Read from the dict, so older run configs still load."""
+    from molcurator.chem import xtb
+    from molcurator.tools.predict import DFT_METHOD
+    predict = config.get("predict") or {}
+    target = (config.get("target") or {}).get("name")
+    method = predict.get("method") or ("GFN2-xTB" if target in xtb.PROPERTIES else DFT_METHOD)
+    by_xtb = xtb.is_xtb(method)
+    label = method if by_xtb or not predict.get("basis") else f"{method}/{predict['basis']}"
+    corrected = bool(predict.get("correction"))
+    if corrected:
+        label += " corrected to DFT-like"
+    return {"method": method, "label": label, "xtb": by_xtb, "corrected": corrected}
 
 
 def best_estimate(record: dict) -> tuple[float | None, str | None]:
@@ -178,7 +196,8 @@ def molecules(path: Path, events: list[dict], config: dict) -> list[dict]:
         results = (e.get("outputs") or {}).get("results") or []
         for cid, status, value in results:
             rec = records.setdefault(cid, {"id": cid, "smiles": None, "round": e.get("round"), "status": None,
-                                           "xtb": None, "ml": None, "qm": None, "qm_method": None,
+                                           "xtb": None, "xtb_raw": None, "xtb_extrapolated": False,
+                                           "ml": None, "qm": None, "qm_method": None,
                                            "error": None, "curated": False, "validated": False, "parent": None})
             rec["status"] = status
             if status == "failed":
@@ -194,9 +213,22 @@ def molecules(path: Path, events: list[dict], config: dict) -> list[dict]:
         rec.update({"smiles": row["smiles"], "curated": True, "validated": row["validated"],
                     "parent": row.get("parent"), "qm_method": row.get("qm_method"),
                     "round": row.get("round") or rec.get("round")})
-        for level in ("ml", "xtb", "qm"):
-            if row[level] is not None:
+        for level in ("ml", "xtb", "xtb_raw", "qm"):
+            if row.get(level) is not None:
                 rec[level] = row[level]
+        rec["xtb_extrapolated"] = row.get("xtb_extrapolated", False)
+    # The trace holds PREDICT's corrected value; dataset.csv has the raw xTB value only for curated
+    # molecules. For the rest it is recovered from the run's correction (corrected = slope*raw + intercept).
+    # Without a correction the raw value is the PREDICT value itself, as in dataset.csv.
+    correction = (config.get("predict") or {}).get("correction")
+    for rec in records.values():
+        if rec.get("xtb") is None or rec.get("xtb_raw") is not None:
+            continue
+        if correction:
+            rec["xtb_raw"] = (rec["xtb"] - correction["intercept"]) / correction["slope"]
+            rec["xtb_extrapolated"] = not correction["xtb_range"][0] <= rec["xtb_raw"] <= correction["xtb_range"][1]
+        else:
+            rec["xtb_raw"] = rec["xtb"]
     target = config.get("target") or {}
     xyz_dir = path / "xyz"
     out = []
@@ -242,6 +274,7 @@ def overview(run_id: str, path: Path, events: list[dict], process: dict) -> dict
         "running_seconds": running_seconds(events, alive),
         "target": config.get("target"),
         "qm_enabled": bool((config.get("qm") or {}).get("enabled")),
+        "predict_level": predict_level(config),
         "decisions": config.get("decisions"),
         "nodes": starts[-1]["inputs"].get("nodes") if starts else [],
         "current": {"node": upcoming if alive else None,

@@ -31,7 +31,8 @@
     token: () => read("token") || "",
     pollSeconds: () => Math.max(2, parseInt(read("pollSeconds"), 10) || 5),
     theme: () => read("theme"),
-    save: function (values) {                        // values: any of apiBase, token, pollSeconds, theme
+    view: () => read("view"),                        // "agent" or "dashboard"
+    save: function (values) {                        // values: any of apiBase, token, pollSeconds, theme, view
       Object.keys(values).forEach((k) => write(k, values[k] == null ? null : String(values[k]).trim()));
     }
   };

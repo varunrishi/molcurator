@@ -4,7 +4,7 @@
 #   scripts/run.sh                   http://127.0.0.1:8000  (prints a fresh API token)
 #   scripts/run.sh --port 9000
 #   scripts/run.sh --host 0.0.0.0    listen on all interfaces (only behind a firewall or tunnel)
-#   scripts/run.sh --install         first install the server's Python packages, then start
+#   scripts/run.sh --install         first install the project's Python packages (uv sync / pip), then start
 #
 # Works from any folder: it changes to the repository root first.
 #
@@ -29,14 +29,18 @@ done
 # Use the project's virtual environment when there is one (scripts/setup.sh creates .venv).
 if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY="${PYTHON:-python3}"; fi
 
+# The server's packages (fastapi, uvicorn) are project dependencies in pyproject.toml.
 if [ "$INSTALL" = 1 ]; then
-    "$PY" -m pip install -r app/server/requirements.txt
-    "$PY" -c "import molcurator" 2>/dev/null || "$PY" -m pip install -e .
+    if command -v uv >/dev/null 2>&1 && [ "$PY" = .venv/bin/python ]; then
+        uv sync                          # the locked project environment (.venv)
+    else
+        "$PY" -m pip install -e .
+    fi
 fi
 
 if ! "$PY" -c "import fastapi, uvicorn, molcurator" 2>/dev/null; then
     echo "Missing Python packages for $PY."
-    echo "Run: scripts/run.sh --install   (or: $PY -m pip install -r app/server/requirements.txt && $PY -m pip install -e .)"
+    echo "Run: scripts/run.sh --install   (or: uv sync, or: $PY -m pip install -e .)"
     exit 1
 fi
 

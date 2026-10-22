@@ -28,22 +28,22 @@ web app / curl ──HTTP──► FastAPI (routes.py)
 | `run_files.py` | turns a run folder into JSON: status, progress, molecules, dataset |
 | `capabilities.py` | what this version supports, tool lookup, checks before a run starts |
 | `chem.py` | RDKit check and 3D preview of a seed molecule |
+| `assistant.py` | prompt → proposed run with Claude (agent view); merged and checked like any config |
 | `settings.py` | settings from environment variables / `.env` |
 
 ## Install
 
-The server needs the MolCurator package plus two packages of its own:
+The server's packages (`fastapi`, `uvicorn`) are ordinary project dependencies in
+`pyproject.toml`, so the normal project setup installs them:
 
 ```bash
-scripts/run.sh --install                                   # into .venv if present, else python3
-# or by hand:
-pip install -r app/server/requirements.txt              # fastapi, uvicorn
-pip install -e .                                     # molcurator (full dependencies)
+uv sync                      # or scripts/setup.sh, or: pip install -e .
+scripts/run.sh --install     # the same, then starts the server
 ```
 
-For a quick install without PyTorch (e.g. on Kaggle), use
-`app/server/requirements-molcurator-light.txt` and then `pip install --no-deps -e .`; it lists the
-packages the code actually imports.
+On Windows, use the conda environment (`environment.yml`) so tblite is installed; without it
+xTB runs through ORCA's built-in xTB. `notebooks/deploy_kaggle.ipynb` installs the project on
+Kaggle without pyscf and langchain-openai, which the agent does not need there.
 
 ## Settings
 
@@ -51,7 +51,8 @@ Environment variables or the repo's `.env`; the full table is in
 [`docs/api/README.md`](../../docs/api/README.md#server-settings). The important ones:
 
 - `MOLCURATOR_API_TOKEN`: the API token. If unset, a new one is printed at each start.
-- `ORCA_BIN`: ORCA 6.1.1+, for QM validation and S1–T1 targets. xTB needs no setting: it runs through tblite.
+- `ORCA_BIN` (or `OPI_ORCA`, or `orca` on PATH): ORCA 6.1.1+, for QM validation and for targets whose
+  PREDICT needs ORCA (e.g. `s1_t1_gap`). xTB needs no setting: it runs in-process through tblite.
 - `MOLCURATOR_MAX_RUNS`: how many runs may run at once (default 1).
 
 ## Tests
@@ -60,12 +61,12 @@ The server's tests are in `tests/server/`, next to the agent's tests, so a plain
 the repository root runs them too. Without the server's packages they are skipped.
 
 ```bash
-pip install -r app/server/requirements-dev.txt          # fastapi, uvicorn, pytest, httpx
-python -m pytest tests/server                           # fake chemistry, no xTB needed (a few seconds)
-MOLCURATOR_TEST_XTB=$(which xtb) python -m pytest tests/server/test_real_xtb.py   # one real xTB run
+uv sync                                                 # includes the dev group: pytest, httpx
+python -m pytest tests/server                           # about 10 s
 ```
 
-The tests run the real agent (graph, trace, checkpoints, CURATE) with the repo's fake tools
+`test_real_xtb.py` makes one small real run with GFN2-xTB through tblite (skipped where tblite
+cannot be imported); the other tests use fake chemistry. They run the real agent (graph, trace, checkpoints, CURATE) with the repo's fake tools
 (`tests/agent/fakes.py`) through `tests/server/fake_agent.py`.
 
 ## Known limits
