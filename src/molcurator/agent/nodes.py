@@ -23,9 +23,21 @@ def generate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     for c in tools.generate(parents, plan.settings(), state["round"], config.rng_seed):
         molecules[c.id] = MoleculeRecord(id=c.id, smiles=c.smiles, round=c.round, parent=c.parent_smiles,
                                          status="duplicate" if c.smiles in seen else "generated",
-                                         xtb=None, ml=None, qm=None, qm_method=None, xyz_path=None, error=None)
+                                         xtb=None, xtb_raw=None, xtb_extrapolated=None, ml=None, qm=None,
+                                         qm_method=None, xyz_path=None, error=None)
         seen.add(c.smiles)
     return {"molecules": molecules}
+
+
+def xtb_fields(value: float | None, config: RunConfig) -> dict:
+    """A molecule's xTB fields from one calculated xTB value. With predict.correction, `xtb` is the
+    DFT-like value slope * xTB + intercept, so everything after PREDICT (TRAIN, ML, SCREEN, the
+    decisions, CURATE) works in the units of the user's target window; `xtb_raw` keeps what xTB gave."""
+    c = config.predict.correction
+    if value is None or c is None:
+        return {"xtb": value, "xtb_raw": value, "xtb_extrapolated": None if value is None else False}
+    return {"xtb": c.slope * value + c.intercept, "xtb_raw": value,
+            "xtb_extrapolated": not c.xtb_range[0] <= value <= c.xtb_range[1]}
 
 
 def predict_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
@@ -44,7 +56,7 @@ def predict_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     for p in results:
         ok = p.status is Status.ok
         molecules[p.candidate_id] = {**molecules[p.candidate_id], "status": "predicted" if ok else "failed",
-                                     "xtb": p.value, "error": p.error,
+                                     **xtb_fields(p.value, config), "error": p.error,
                                      "xyz_path": str(p.xyz_path) if p.xyz_path else None}
     return {"molecules": molecules}
 
@@ -115,7 +127,7 @@ def validate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
         if sorted(p.candidate_id for p in results) != sorted(c.id for c in no_geometry):
             raise ValueError("predict must return exactly one result per candidate (R2.4)")
         for p in results:
-            molecules[p.candidate_id] = {**molecules[p.candidate_id], "xtb": p.value, "error": p.error,
+            molecules[p.candidate_id] = {**molecules[p.candidate_id], **xtb_fields(p.value, config), "error": p.error,
                                          "xyz_path": str(p.xyz_path) if p.xyz_path else None,
                                          **({} if p.status is Status.ok else {"status": "failed"})}
     batch = [i for i in state["qm_batch"] if molecules[i]["xyz_path"] is not None]
@@ -136,18 +148,23 @@ def validate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
 def curate_node(state: AgentState, config: RunConfig, tools: Toolset) -> dict:
     """CURATE: molecules whose best estimate (QM, else xTB, else ML) lies inside the target, with no
     screening margin, join the dataset with a value at every level they have (R11.2, R11.3).
-    With QM on, only this round's QM-validated molecules qualify; with QM off, screened-in ones do."""
+    With QM on, only this round's QM-validated molecules qualify; with QM off, screened-in ones do.
+    A molecule known only from an extrapolated corrected xTB value (outside the correction's fitted
+    range) is not curated: that value is too uncertain. A QM value, when there is one, still decides."""
     molecules = dict(state["molecules"])
     pool = ([molecules[i] for i in state["qm_batch"] if molecules[i]["status"] == "validated"] if config.qm.enabled
             else [m for m in molecules.values() if m["status"] == "screened_in"])
-    hits = [m for m in pool if target_distance(best_estimate(m), config.target) <= 1e-9]
+    hits = [m for m in pool if target_distance(best_estimate(m), config.target) <= 1e-9
+            and not (m["qm"] is None and m.get("xtb_extrapolated"))]
     if not hits:
         return {}
-    levels = lambda m: {"ml": m["ml"], "xtb": m["xtb"], m["qm_method"]: m["qm"]}  # noqa: E731
+    levels = lambda m: {"ml": m["ml"], "xtb": m["xtb"], "xtb_raw": m.get("xtb_raw"), m["qm_method"]: m["qm"]}  # noqa: E731
     entries = [CuratedEntry(id=m["id"], smiles=m["smiles"], xyz_path=m["xyz_path"], validated=m["qm"] is not None,
                             properties={k: v for k, v in levels(m).items() if k and v is not None},
                             provenance={"parent": m["parent"], "round": str(m["round"]), "seeds": ";".join(config.seeds),
-                                        "generator": state["round_plan"]["generator"]})  # v1 has one generator
+                                        "generator": state["round_plan"]["generator"],  # v1 has one generator
+                                        # how the xtb value was made: outside the correction's fitted range?
+                                        **({} if m.get("xtb_extrapolated") is None else {"xtb_extrapolated": str(m["xtb_extrapolated"])})})
                for m in hits]
     size = tools.curate(entries, Path(state["run_dir"]))  # idempotent, so a resumed re-run adds nothing (R7.2)
     for m in hits:

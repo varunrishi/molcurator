@@ -52,8 +52,29 @@ class LLMSettings(StrictModel):
     max_table_rows: int = Field(default=20, ge=1)  # candidates shown to the QM-batch decision (R3.2)
 
 
+CORRECTED_PROPERTY = "homo_lumo_gap"  # the only target the xTB -> DFT-like correction is fitted for
+
+
+class CorrectionSettings(StrictModel):
+    """On-top correction of xTB gaps to DFT-like values, applied at the end of PREDICT:
+    corrected = slope * xTB + intercept, fitted on paired gaps by scripts/fit_xtb_correction.py."""
+
+    slope: float = Field(gt=0)  # positive: the correction must keep the order of the gaps
+    intercept: float
+    residual_sd: float = Field(ge=0)  # the fit's typical error (eV), a guide for screening.margin
+    xtb_range: tuple[float, float]  # raw xTB gaps the fit was made on; outside it, it extrapolates
+    fitted_on: str  # what the fit used, recorded in the trace with the config
+
+    @model_validator(mode="after")
+    def _range_in_order(self):
+        if self.xtb_range[0] > self.xtb_range[1]:
+            raise ValueError(f"xtb_range must be [low, high], got {list(self.xtb_range)}")
+        return self
+
+
 class PredictSettings(StrictModel):
     n_xtb: int = Field(default=200, ge=1)  # xTB on a random sample of this many new candidates per round (R10.1)
+    correction: CorrectionSettings | None = None  # none: PREDICT keeps the raw xTB values
 
 
 class TrainSettings(StrictModel):
@@ -98,6 +119,14 @@ class RunConfig(StrictModel):
                 raise ValueError(f"seed is not a valid SMILES: {smiles!r}")
             canonical.append(Chem.MolToSmiles(mol))
         return canonical
+
+    @model_validator(mode="after")
+    def _correction_only_for_gaps(self) -> "RunConfig":
+        # The correction is fitted on xTB vs DFT HOMO-LUMO gaps; for any other property it would be wrong.
+        if self.predict.correction is not None and self.target.name != CORRECTED_PROPERTY:
+            raise ValueError(f"predict.correction applies to {CORRECTED_PROPERTY} only, not {self.target.name!r}; "
+                             "remove it from this config")
+        return self
 
 
 def load_config(path: str | Path) -> RunConfig:

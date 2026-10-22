@@ -78,7 +78,7 @@ Tool nodes put one compact entry per molecule they changed in `outputs.results`:
 | Node | Value |
 |---|---|
 | `generate` | canonical SMILES |
-| `predict` | xTB value (target units) |
+| `predict` | xTB value (target units); with `predict.correction` in the config, the DFT-like corrected value (the correction is in `run_start`) |
 | `ml_predict` | ML estimate |
 | `validate` | QM value |
 | `screen`, `curate` | `null`; the status is the result |

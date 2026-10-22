@@ -8,19 +8,21 @@ from pathlib import Path
 
 from molcurator.schemas import CuratedEntry
 
-COLUMNS = ["id", "smiles", "xyz_path", "ml", "xtb", "qm", "qm_method", "validated",
+COLUMNS = ["id", "smiles", "xyz_path", "ml", "xtb", "xtb_raw", "xtb_extrapolated", "qm", "qm_method", "validated",
            "parent", "round", "generator", "seeds"]  # fixed, so rows can be appended round after round
 
 
 def dataset_row(entry: CuratedEntry, run_dir: Path) -> dict:
     """One dataset.csv row: a value at every level the molecule has; a missing level is empty (R11.3).
-    Any property key other than ml/xtb is the QM value, named by its method."""
-    qm = {k: v for k, v in entry.properties.items() if k not in ("ml", "xtb")}
+    xtb is DFT-like when the run corrects xTB (predict.correction); xtb_raw is the value xTB calculated.
+    Any property key other than ml/xtb/xtb_raw is the QM value, named by its method."""
+    qm = {k: v for k, v in entry.properties.items() if k not in ("ml", "xtb", "xtb_raw")}
     xyz = entry.xyz_path
     if xyz is not None and Path(xyz).is_relative_to(run_dir):
         xyz = Path(xyz).relative_to(run_dir)  # relative, so the run folder can be moved or shared
     return {"id": entry.id, "smiles": entry.smiles, "xyz_path": xyz or "",
             "ml": entry.properties.get("ml", ""), "xtb": entry.properties.get("xtb", ""),
+            "xtb_raw": entry.properties.get("xtb_raw", ""), "xtb_extrapolated": entry.provenance.get("xtb_extrapolated", ""),
             "qm": next(iter(qm.values()), ""), "qm_method": next(iter(qm), ""), "validated": entry.validated,
             **{k: entry.provenance.get(k, "") for k in ("parent", "round", "generator", "seeds")}}
 
