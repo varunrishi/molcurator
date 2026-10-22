@@ -11,7 +11,7 @@ then xTB or ORCA single point. No electronic geometry optimization is added.
 From the repository root:
 
 ```bash
-cp subprojects/property_validation_v1/config/chemistry.example.json chemistry.json
+cp configs/chemistry.example.json chemistry.json
 export MOLCURATOR_CHEM_CONFIG="$PWD/chemistry.json"
 uv run --no-sync python scripts/check_property_tools.py --backend all
 ```

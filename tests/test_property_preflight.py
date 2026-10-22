@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from molcurator_property_validation.chem.environment import load_binary_environment
+from molcurator.chem.environment import load_binary_environment
 
 spec=importlib.util.spec_from_file_location('check_property_tools',Path(__file__).resolve().parents[1]/'scripts/check_property_tools.py')
 check=importlib.util.module_from_spec(spec);spec.loader.exec_module(check)
@@ -54,3 +54,18 @@ def test_runtime_smoke_failure_returns_nonzero(tmp_path,monkeypatch,capsys):
     assert check.main()==1
     report=json.loads(capsys.readouterr().out)
     assert report['runtime_tested'] and not report['ok']
+
+
+def test_environment_found_when_running_outside_the_repository(tmp_path,monkeypatch):
+    """From a folder with no .env above it (e.g. a notebook elsewhere), the repository's .env is used;
+    a .env at or above the working directory still comes first."""
+    from molcurator.chem import environment
+    repo_env=tmp_path/'repo'/'.env'; repo_env.parent.mkdir(); repo_env.write_text('XTB_BIN=/repo/xtb\nORCA_BIN=/repo/orca\n')
+    monkeypatch.setattr(environment,'REPO_ENV',repo_env)
+    monkeypatch.setenv('XTB_BIN','');monkeypatch.setenv('ORCA_BIN','')  # unset for the loader, restored after
+    elsewhere=tmp_path/'elsewhere'; elsewhere.mkdir(); monkeypatch.chdir(elsewhere)
+    load_binary_environment()
+    assert (os.environ['XTB_BIN'],os.environ['ORCA_BIN'])==('/repo/xtb','/repo/orca')
+    monkeypatch.setenv('XTB_BIN','');(elsewhere/'.env').write_text('XTB_BIN=/local/xtb\n')
+    load_binary_environment()
+    assert os.environ['XTB_BIN']=='/local/xtb'

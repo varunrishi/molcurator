@@ -10,22 +10,21 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 # Also works before installation, so missing dependencies can be reported clearly.
 sys.path.insert(0, str(ROOT / 'src'))
-sys.path.insert(0, str(ROOT / 'subprojects/property_validation_v1/src'))
-from molcurator_property_validation.chem.environment import load_binary_environment
+from molcurator.chem.environment import load_binary_environment
 
 
 def preflight(backend='all', env_file=None):
     load_binary_environment(env_file if env_file is not None else ROOT / '.env')
     checks = [dict(name='Python >= 3.11', ok=sys.version_info >= (3,11), detail=sys.version.split()[0])]
     for name in ('rdkit', 'pydantic', 'yaml', 'molcurator.tools.predict', 'molcurator.tools.validate',
-                 'molcurator_property_validation.tools.predict', 'molcurator_property_validation.tools.validate'):
+                 'molcurator.tools.predict', 'molcurator.tools.validate'):
         try:
             module = importlib.import_module(name)
             checks.append(dict(name=name, ok=True, detail=str(getattr(module, '__version__', 'import OK'))))
         except Exception as exc:
             checks.append(dict(name=name, ok=False, detail=f'{type(exc).__name__}: {exc}'))
     try:
-        from molcurator_property_validation.chem.settings import load_settings
+        from molcurator.chem.settings import load_settings
         settings = load_settings()
         checks.append(dict(name="chemistry settings", ok=True, detail=settings.model_dump()))
     except Exception as exc:
@@ -45,7 +44,7 @@ def smoke(backend, output, resume=False):
     from molcurator.schemas import Candidate, Prediction, PropertyTarget, QMSettings, Status
     from molcurator.tools.predict import predict
     from molcurator.tools.validate import validate
-    from molcurator_property_validation.chem.geometry import lowest_ff_conformer
+    from molcurator.chem.geometry import lowest_ff_conformer
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=resume)
     candidate = Candidate(id='ethanol', smiles='CCO', parent_smiles='CCO', round=1, generator='preflight')

@@ -1,8 +1,8 @@
 import importlib,json
 import pytest
 from molcurator.schemas import Prediction, PropertyTarget, QMSettings, Status
-from molcurator_property_validation.chem.calculations import orca_gap
-module=importlib.import_module("molcurator_property_validation.tools.validate")
+from molcurator.chem.calculations import orca_gap
+module=importlib.import_module("molcurator.tools.validate")
 TARGET=PropertyTarget(name="homo_lumo_gap",min=3,max=4)
 XYZ="2\nfixture\nH 0 0 0\nH 0 0 .74\n"
 LOG="SCF CONVERGED AFTER 5 CYCLES\nORBITAL ENERGIES\n 0 2.0 -0.2 -5.0\n 1 0.0 -0.05 -1.5\n\nORCA TERMINATED NORMALLY\n"

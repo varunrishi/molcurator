@@ -4,9 +4,9 @@ from pathlib import Path
 import shutil
 import pytest
 from molcurator.schemas import Candidate, PropertyTarget, Status
-from molcurator_property_validation.chem.geometry import lowest_ff_conformer, xyz_symbols
+from molcurator.chem.geometry import lowest_ff_conformer, xyz_symbols
 
-module=importlib.import_module("molcurator_property_validation.tools.predict")
+module=importlib.import_module("molcurator.tools.predict")
 TARGET=PropertyTarget(name="homo_lumo_gap",min=3,max=4)
 XYZ="2\nfixture\nH 0 0 0\nH 0 0 .74\n"
 LOG="HOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n"
@@ -66,7 +66,7 @@ def test_unsupported_target_has_failed_result(tmp_path):
 
 
 def test_missing_mmff_parameters_fail_without_uff(monkeypatch):
-    from molcurator_property_validation.chem import geometry
+    from molcurator.chem import geometry
     monkeypatch.setattr(geometry.AllChem, "MMFFHasAllMoleculeParams", lambda mol: False)
     with pytest.raises(ValueError, match="MMFF94 parameters unavailable"):
         lowest_ff_conformer("CCO", nconfs=2)

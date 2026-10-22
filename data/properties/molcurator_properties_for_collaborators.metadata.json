@@ -15,7 +15,7 @@
   "sha256": "fe88e1637136e0b9557caf09fbdee38484e7c4942a4aca176e8e32870d364512",
   "source_repository": "aelm-nv/molcurator",
   "source_commit": "61f91ec719a5dbe416cada0a9941e578e52ffe6c",
-  "source_path": "subprojects/property_validation_v1/molcurator_properties_for_collaborators.csv",
+  "source_path": "data/properties/molcurator_properties_for_collaborators.csv",
   "row_identity": [
     "dataset",
     "candidate_id"

@@ -10,7 +10,7 @@ from molcurator.tools.validate import validate
 # results = validate(selected_predictions, config.target, config.qm)
 ```
 
-Signatures and shared result models are unchanged. Root setuptools includes the isolated implementation in the normal root installation, so no sys.path manipulation or second subproject installation is required. In an existing compatible environment, run `python -m pip install --no-deps -e .` from the repository root to refresh installation; use the project's normal dependency setup on a fresh machine.
+Signatures and shared result models are unchanged. The implementation is part of the main `molcurator` package (`src/molcurator/tools`, `chem`, `batch`), installed with the rest of the project (`uv sync`); no sys.path manipulation or second installation is needed.
 
 Export XTB_BIN and ORCA_BIN or place executables on PATH and load required cluster runtime modules. PREDICT estimates raw GFN2-xTB HOMO-LUMO gap in eV and returns the selected MMFF94-optimized XYZ. VALIDATE reuses that geometry for one configured ORCA single point per selected molecule. IDs/order, failed records, geometry reports, raw logs and attempt records are retained. The graph owns selection and cumulative budgets.
 

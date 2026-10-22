@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 from molcurator.schemas import Prediction, QMResult, Status
-from molcurator_property_validation import batch, reporting, slurm
-from molcurator_property_validation.chem.settings import active_settings
+from molcurator.batch import cli as batch, reporting, slurm
+from molcurator.chem.settings import active_settings
 
 
 @pytest.fixture
@@ -188,7 +188,7 @@ def test_slurm_does_not_submit_by_default_and_records_explicit_submission(tmp_pa
 def test_settings_are_frozen_for_batch_invocation(tmp_path, source, tools, monkeypatch):
     settings = tmp_path / "settings.json"; settings.write_text('{"nconfs": 4}')
     monkeypatch.setenv("MOLCURATOR_CHEM_CONFIG", str(settings))
-    from molcurator_property_validation.chem.settings import load_settings
+    from molcurator.chem.settings import load_settings
     seen = []
     original = batch.predict
     def edited_configuration(*args):

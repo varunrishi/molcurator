@@ -2,7 +2,7 @@
 import csv
 import io
 import json
-from .fileio import atomic_json
+from molcurator.chem.fileio import atomic_json
 
 CSV_COLUMNS = ('csv_schema_version', 'candidate_id', 'smiles', 'parent_smiles', 'round', 'generator', 'xtb_status', 'xtb_gap_ev', 'xtb_error', 'xyz_path', 'orca_status', 'orca_selection', 'failure_stage', 'prevalidation_status', 'prevalidation_stage', 'prevalidation_code', 'prevalidation_error', 'input_formal_charge', 'input_radical_electrons', 'orca_gap_ev', 'orca_error', 'method', 'ff_energy_kcal_mol', 'ff_boltzmann_weight', 'temperature_k', 'n_unique_conformers', 'xtb_calls_total', 'orca_calls_total', 'cache_hits_total', 'runtime_s_total')
 

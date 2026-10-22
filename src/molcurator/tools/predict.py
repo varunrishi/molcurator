@@ -1,18 +1,29 @@
-"""Contract adapter: lowest MMFF94 minimum -> GFN2-xTB single-point orbital gap."""
+"""Contract adapter: lowest MMFF94 minimum -> GFN2-xTB single-point orbital gap.
+
+PREDICT, the cheap physics estimate: SMILES -> MMFF94 conformer ensemble -> lowest converged minimum
+-> GFN2-xTB single-point HOMO-LUMO gap. Calls the external `xtb` binary: XTB_BIN from the environment
+or .env (written by scripts/setup.sh), otherwise `xtb` on PATH.
+"""
 import json
 import shutil
 from pathlib import Path
 
-from molcurator_property_validation.chem.calculations import require_gap_target, run, safe_id, xtb_gap
-from molcurator_property_validation.chem.geometry import lowest_ff_conformer, xyz_symbols
-from molcurator_property_validation.chem.prevalidation import prepare_geometry
-from molcurator_property_validation.chem.settings import load_settings
-from molcurator_property_validation.chem.tracking import calculate
+from molcurator.chem.calculations import require_gap_target, run, safe_id, xtb_gap
+from molcurator.chem.geometry import lowest_ff_conformer, xyz_symbols
+from molcurator.chem.prevalidation import prepare_geometry
+from molcurator.chem.settings import load_settings
+from molcurator.chem.tracking import calculate
 from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status
 
 
 def predict(candidates: list[Candidate], target: PropertyTarget, xyz_dir: Path) -> list[Prediction]:
-    """Return one ordered result per candidate; report FF weights in per-molecule JSON."""
+    """xTB estimate of the target property for each candidate (contract: Phase 2 plan, R2.2).
+
+    Returns exactly one Prediction per candidate, in the same order. A molecule that fails
+    (embedding, MMFF94 convergence, xTB execution) is returned with status "failed" and an error,
+    never dropped. Every "ok" result has a value and the selected MMFF94 geometry written to
+    xyz_dir/<id>.xyz. FF weights are reported in per-molecule JSON.
+    """
     results = []
     for candidate in candidates:
         try:

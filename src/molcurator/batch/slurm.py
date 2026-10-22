@@ -98,7 +98,7 @@ def render(config):
         if value is not None:
             lines.append(f"export {key}=" + shlex.quote(value))
     python = str(PurePosixPath(config.project_dir) / config.python)
-    arguments = [python, "-m", "molcurator_property_validation.batch", "run", config.input, "--out", config.out]
+    arguments = [python, "-m", "molcurator.batch.cli", "run", config.input, "--out", config.out]
     if config.orca:
         arguments.append("--orca")
     if config.orca_limit is not None:

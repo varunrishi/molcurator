@@ -2,7 +2,7 @@
 import csv
 from pathlib import Path
 from molcurator.schemas import Candidate
-from .chem.calculations import safe_id
+from molcurator.chem.calculations import safe_id
 
 
 def read_candidates(path, format="auto"):

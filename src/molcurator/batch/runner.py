@@ -9,10 +9,10 @@ import uuid
 from molcurator.schemas import PropertyTarget, QMSettings, Status
 from molcurator.tools.predict import predict
 from molcurator.tools.validate import validate
-from .batch_inputs import read_candidates
-from .batch_runtime import check_allocation, run_lock
-from .chem.settings import active_settings, load_settings
-from .fileio import atomic_json, native_path
+from .inputs import read_candidates
+from .runtime import check_allocation, run_lock
+from molcurator.chem.settings import active_settings, load_settings
+from molcurator.chem.fileio import atomic_json, native_path
 
 
 def run_batch(args, *, predict_fn=None, validate_fn=None):

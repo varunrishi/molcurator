@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 
 from molcurator.schemas import Candidate, PropertyTarget, QMSettings, Status
-from molcurator_property_validation.chem import geometry
+from molcurator.chem import geometry
 
-predict_module = importlib.import_module("molcurator_property_validation.tools.predict")
-validate_module = importlib.import_module("molcurator_property_validation.tools.validate")
+predict_module = importlib.import_module("molcurator.tools.predict")
+validate_module = importlib.import_module("molcurator.tools.validate")
 TARGET = PropertyTarget(name="homo_lumo_gap", min=0)
 XYZ = "2\ntest\nH 0 0 0\nH 0 0 .74\n"
 REPORT = dict(force_field="MMFF94", selected_ff_energy_kcal_mol=0,

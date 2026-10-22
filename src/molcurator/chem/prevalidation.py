@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 import uuid
 
-from ..fileio import atomic_json, native_path
+from .fileio import atomic_json, native_path
 
 
 class PreparationError(ValueError):

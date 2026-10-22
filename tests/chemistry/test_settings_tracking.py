@@ -6,10 +6,10 @@ import sys
 
 import pytest
 
-from molcurator_property_validation.chem import tracking
-from molcurator_property_validation.chem.calculations import run, xtb_gap
-from molcurator_property_validation.chem.geometry import lowest_ff_conformer
-from molcurator_property_validation.chem.settings import ChemistrySettings, load_settings
+from molcurator.chem import tracking
+from molcurator.chem.calculations import run, xtb_gap
+from molcurator.chem.geometry import lowest_ff_conformer
+from molcurator.chem.settings import ChemistrySettings, load_settings
 from molcurator.schemas import Prediction, PropertyTarget, QMSettings, Status
 
 
@@ -145,7 +145,7 @@ def test_missing_binary_has_zero_process_launches(tmp_path, monkeypatch):
 
 def test_configured_orca_resources_reach_input(tmp_path, monkeypatch):
     config(tmp_path, monkeypatch, orca_nprocs=4, orca_maxcore_mb=1500)
-    module = importlib.import_module("molcurator_property_validation.tools.validate")
+    module = importlib.import_module("molcurator.tools.validate")
     xyz = tmp_path / "mol.xyz"
     xyz.write_text("2\ntest\nH 0 0 0\nH 0 0 .74\n")
     def fake_run(key, backend, args, cwd, log):
@@ -162,7 +162,7 @@ def test_configured_orca_resources_reach_input(tmp_path, monkeypatch):
 
 
 def test_summary_counts_launches_not_cache_events(tmp_path, monkeypatch):
-    from molcurator_property_validation.chem.summary import summarize
+    from molcurator.chem.summary import summarize
     invoke(tmp_path, monkeypatch)
     invoke(tmp_path, monkeypatch)
     interrupted = tmp_path / "orca/attempts/interrupted"
@@ -215,14 +215,14 @@ def test_corrupted_manifest_is_recomputed(tmp_path, monkeypatch):
 
 def test_public_smoke_resume_reuses_both_backends(tmp_path, monkeypatch):
     import importlib.util
-    script = Path(__file__).resolve().parents[3] / "scripts/check_property_tools.py"
+    script = Path(__file__).resolve().parents[2] / "scripts/check_property_tools.py"
     spec = importlib.util.spec_from_file_location("restart_smoke_check", script)
     check = importlib.util.module_from_spec(spec); spec.loader.exec_module(check)
     config(tmp_path, monkeypatch, nconfs=3)
     monkeypatch.setenv("XTB_BIN", sys.executable)
     monkeypatch.setenv("ORCA_BIN", sys.executable)
-    predict_module = importlib.import_module("molcurator_property_validation.tools.predict")
-    validate_module = importlib.import_module("molcurator_property_validation.tools.validate")
+    predict_module = importlib.import_module("molcurator.tools.predict")
+    validate_module = importlib.import_module("molcurator.tools.validate")
     def controlled_process(key, backend, args, cwd, log):
         output = ("xtb version 6.7.1\nHOMO-LUMO GAP 3.25 eV\nnormal termination of xtb\n"
                   if backend == "xtb" else
@@ -237,7 +237,7 @@ def test_public_smoke_resume_reuses_both_backends(tmp_path, monkeypatch):
     second = check.smoke("all", out, resume=True)
     assert second["ok"] and second["cache_hits"] == 2
     assert second["electronic_calls_attempted"] == 0
-    from molcurator_property_validation.chem.summary import summarize
+    from molcurator.chem.summary import summarize
     assert summarize(out)["by_backend"] == dict(xtb=1, orca=1)
 
     # A changed functional must not reuse an earlier ORCA result.

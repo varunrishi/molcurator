@@ -1,8 +1,8 @@
 """CSV summaries and scientific plots from actual batch results and attempt records."""
 import json
 
-from .chem.summary import summarize
-from .fileio import atomic_json, native_path
+from molcurator.chem.summary import summarize
+from molcurator.chem.fileio import atomic_json, native_path
 from .report_tables import build_rows, write_csv
 
 

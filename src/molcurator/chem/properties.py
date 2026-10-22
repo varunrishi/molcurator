@@ -1,7 +1,7 @@
 """Extract explicit orbital/dipole values; never infer absolute orbitals from a gap."""
 import re
 
-from .chem.calculations import NUMBER, number, orca_gap, xtb_gap
+from .calculations import NUMBER, number, orca_gap, xtb_gap
 
 UNITS = {"homo_lumo_gap": "eV", "homo": "eV", "lumo": "eV", "dipole": "D"}
 

@@ -39,7 +39,7 @@ distributions into the same environment. A fresh root environment avoids the con
 When using a minimal compatible environment, the module form is equivalent:
 
 ```bash
-python -m molcurator_property_validation.batch --help
+molcurator-properties --help
 ```
 
 Set `XTB_BIN`, optional `ORCA_BIN`, and `MOLCURATOR_CHEM_CONFIG` as described in
@@ -177,12 +177,12 @@ may need report regeneration after restart.
 
 ## Prepare a SLURM job
 
-Copy and edit `config/slurm.example.json` in this subproject. All paths inside the
+Copy and edit `configs/slurm.example.json`. All paths inside the
 JSON refer to the **Linux cluster**, even if the script is generated on Windows.
 Use absolute POSIX paths for project, input, output, chemistry config and binaries.
 
 ```bash
-cp subprojects/property_validation_v1/config/slurm.example.json slurm.json
+cp configs/slurm.example.json slurm.json
 uv run --no-sync molcurator-properties slurm \
   --config slurm.json --script jobs/generated-001.sbatch
 ```
@@ -241,10 +241,12 @@ zero new electronic launches. No live SLURM or ORCA execution is claimed by thes
 
 ## Independent modules
 
-- `batch.py`: CLI dispatch and compatibility facade.
-- `batch_inputs.py`: input parsing and identity/provenance validation.
-- `batch_runner.py`: checkpointed execution with injectable prediction/validation functions.
-- `batch_runtime.py`: run locks and allocation checks.
+In `src/molcurator/batch/` (`fileio.py` is in `src/molcurator/chem/`):
+
+- `cli.py`: CLI dispatch and compatibility facade.
+- `inputs.py`: input parsing and identity/provenance validation.
+- `runner.py`: checkpointed execution with injectable prediction/validation functions.
+- `runtime.py`: run locks and allocation checks.
 - `fileio.py`: platform paths and atomic JSON with no chemistry/plotting dependency.
 - `report_tables.py`: normalized CSV rows, stable headers and CSV schema metadata.
 - `reporting.py`: report assembly and cumulative summaries; no plotting imports by default.
@@ -253,7 +255,7 @@ zero new electronic launches. No live SLURM or ORCA execution is claimed by thes
 
 Report regeneration and CSV export can run independently of calculations. Plotting
 is a separate optional layer. The public MolCurator tool signatures are unchanged.
-The local validation report is in [reports/local_xtb_validation_20261021](../reports/local_xtb_validation_20261021/README.md). Changes are published on the tool branch; main is unchanged.
+The local validation report is in [research/property_validation/reports/local_xtb_validation_20261021](../../research/property_validation/reports/local_xtb_validation_20261021/README.md). Changes are published on the tool branch; main is unchanged.
 
 
 ## Pre-validation: stop the failed molecule before electronic work

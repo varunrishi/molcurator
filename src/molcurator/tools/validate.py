@@ -1,19 +1,28 @@
-"""Contract adapter: one configurable ORCA single point per selected MMFF94 geometry."""
+"""Contract adapter: one configurable ORCA single point per selected MMFF94 geometry.
+
+VALIDATE, the expensive QM check: DFT HOMO-LUMO gap with ORCA (ORCA_BIN, else `orca` on PATH), starting
+from the geometry PREDICT selected. Only the orca backend and gap targets are implemented; a PySCF
+backend and TADF S1/T1 calculations are not.
+"""
 import re
 import shutil
 
-from molcurator_property_validation.chem.calculations import orca_gap, require_gap_target, run, safe_id
-from molcurator_property_validation.chem.geometry import xyz_symbols
-from molcurator_property_validation.chem.settings import load_settings
-from molcurator_property_validation.chem.tracking import calculate
+from molcurator.chem.calculations import orca_gap, require_gap_target, run, safe_id
+from molcurator.chem.geometry import xyz_symbols
+from molcurator.chem.settings import load_settings
+from molcurator.chem.tracking import calculate
 from molcurator.schemas import Prediction, PropertyTarget, QMResult, QMSettings, Status
 
 
 def validate(items: list[Prediction], target: PropertyTarget, qm: QMSettings) -> list[QMResult]:
-    """Keep input IDs/order and failures; no retries, TADF, or conformer aggregation.
+    """QM value of the target property for each selected molecule (contract: Phase 2 plan, R2.2).
 
-    Each item can invoke ORCA once. attempt.json records attempts, including failures;
-    the orchestrator remains responsible for its overall QM budget.
+    Starts from each item's selected MMFF94 geometry (xyz_path). Returns exactly one QMResult per
+    item, in the same order, with `method` naming the level of theory (e.g. "dft:B3LYP/def2-SVP").
+    A failed calculation is returned with status "failed" and an error, never dropped.
+    No retries, TADF, or conformer aggregation: each item can invoke ORCA once, and attempt.json
+    records attempts, including failures. The agent passes only the QM batch, already trimmed to
+    the remaining QM budget (R4.2).
     """
     results = []
     method = f"dft:{qm.functional}/{qm.basis}"

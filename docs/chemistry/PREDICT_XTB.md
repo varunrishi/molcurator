@@ -3,7 +3,7 @@
 Branch `tools/predict-xtb` implements the first supported target, `homo_lumo_gap` in eV, using the exact shared `predict(candidates, target, xyz_dir)` signature. The generator merged into main can pass its Candidate list directly. The return is one shared Prediction per input, with preserved IDs/order and explicit failures.
 
 ```python
-from molcurator_property_validation.tools.predict import predict
+from molcurator.tools.predict import predict
 # predictions = predict(candidates, config.target, run_dir / "xyz")
 ```
 

@@ -13,7 +13,7 @@ import uuid
 
 from rdkit import rdBase
 from .settings import active_settings
-from ..fileio import atomic_json, native_path
+from .fileio import atomic_json, native_path
 
 POLICY_VERSION = "mmff94-single-point-v2"
 

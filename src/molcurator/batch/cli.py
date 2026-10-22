@@ -5,14 +5,14 @@ import subprocess
 import sys
 from molcurator.tools.predict import predict
 from molcurator.tools.validate import validate
-from .batch_inputs import read_candidates
-from .batch_runtime import run_lock, check_allocation
-from .fileio import native_path
+from .inputs import read_candidates
+from .runtime import run_lock, check_allocation
+from molcurator.chem.fileio import native_path
 
 
 def run_batch(args):
-    # Compatibility facade; Python callers may use batch_runner directly.
-    from .batch_runner import run_batch as execute
+    # Compatibility facade; Python callers may use molcurator.batch.runner directly.
+    from .runner import run_batch as execute
     return execute(args, predict_fn=predict, validate_fn=validate)
 
 

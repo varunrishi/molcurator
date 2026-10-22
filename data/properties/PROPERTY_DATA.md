@@ -29,7 +29,7 @@ Blank cells mean unavailable values, never zero. Check `status` and required col
 ```python
 import pandas as pd
 
-df = pd.read_csv('subprojects/property_validation_v1/molcurator_properties_for_collaborators.csv')
+df = pd.read_csv('data/properties/molcurator_properties_for_collaborators.csv')
 b3lyp = df[(df.dataset == 'b3lyp_validation60') & (df.status == 'ok')]
 pbe0 = df[(df.dataset == 'historical_pbe0_276') & df.orca_gap_ev.notna()]
 # PBE0 status is unavailable; a present label alone does not confirm convergence.
