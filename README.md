@@ -38,7 +38,7 @@ seed molecule + target property
 | Tool | Purpose |
 |------|---------|
 | `GENERATE` | Generate new molecules (SMILES / coordinates) from a seed molecule |
-| `PREDICT`  | SMILES → 3D geometry → xTB optimisation → property extraction |
+| `PREDICT`  | SMILES → MMFF94 geometry → GFN2-xTB property (or B97-3c TD-DFT when xTB cannot give it, e.g. S1-T1) |
 | `TRAIN`    | Train ML models (e.g. ChemProp) for the target property on the growing dataset |
 | `VALIDATE` | Compute the property for screened molecules with more accurate quantum chemistry methods |
 | `CURATE`   | Add verified molecules to the dataset with SMILES, structure and multi-level properties |
@@ -55,8 +55,8 @@ seed molecule + target property
 - **Decision model**: [Claude Haiku 4.5](https://docs.claude.com/) through the Anthropic SDK (~2 s per decision); optionally any OpenAI-compatible endpoint, such as a local model in Ollama
 - **Molecular generation**: [RDKit](https://www.rdkit.org/) plus the pretrained Mol2Mol model ([REINVENT4](https://github.com/MolecularAI/REINVENT4)), or stochastic molecular evolution with [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies)
 - **Property prediction (ML)**: [ChemProp](https://github.com/chemprop/chemprop)
-- **Semi-empirical**: xTB
-- **Quantum chemistry**: [ORCA](https://www.faccts.de/orca/) (default, driven from Python by OPI) or [PySCF](https://pyscf.org/)
+- **Semi-empirical**: GFN2-xTB through [tblite](https://github.com/tblite/tblite)'s Python API (no binary)
+- **Quantum chemistry**: [ORCA](https://www.faccts.de/orca/) 6.1.1+, driven from Python by OPI (`orca-pi`)
 
 ## Installation
 
@@ -71,9 +71,9 @@ source .venv/bin/activate
 
 `scripts/setup.sh` is safe to re-run. It:
 
-1. creates `.env` from `.env.example` (settings for xtb and the LLM; values already set in your environment take precedence);
-2. installs [uv](https://docs.astral.sh/uv/) if needed and runs `uv sync` (Python 3.11 and all dependencies, pinned in `uv.lock`);
-3. finds or installs **xtb**: an existing `XTB_BIN` or `xtb` on `PATH`, else a conda-forge env named `xtb` (if conda, mamba or micromamba is installed), else the official Linux release in `.tools/`. The path is saved to `.env`;
+1. creates `.env` from `.env.example` (settings for ORCA and the LLM; values already set in your environment take precedence);
+2. installs [uv](https://docs.astral.sh/uv/) if needed and runs `uv sync` (Python 3.11 and all dependencies, pinned in `uv.lock`). This includes xTB, through tblite;
+3. looks for **ORCA** (`ORCA_BIN` or `orca` on `PATH`) and **Open MPI** (`OPENMPI_HOME`, `mpirun` on `PATH`, or a conda env) and saves their paths to `.env`. ORCA cannot be installed by the script;
 4. sets up the optional **local model**: starts Ollama if needed and pulls `qwen3:4b`. Skip it with `--no-llm`; the default Claude backend only needs `ANTHROPIC_API_KEY` in `.env`.
 
 At the end it lists anything it could not do automatically.
@@ -82,8 +82,7 @@ At the end it lists anything it could not do automatically.
 
 - **An Anthropic API key** for the default decision model: add `ANTHROPIC_API_KEY=...` to `.env` (gitignored). Without it, runs can use rule-based decisions.
 - **Ollama** (optional, for a local model): https://ollama.com/download.
-- **ORCA** (default quantum chemistry backend): install a current release (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. Without ORCA, set `qm.backend: pyscf` in the run config (PySCF is installed with the package). QM is off by default, so ORCA is only needed when the run config has a `qm:` section.
-- **conda** (macOS only, for xtb): if you have neither conda nor an xtb binary, install [Miniforge](https://conda-forge.org/download/). On Linux the script downloads xtb itself.
+- **ORCA** (quantum chemistry): install ORCA 6.1.1 or newer (free academic licence, https://orcaforum.kofo.mpg.de), then set `ORCA_BIN=/path/to/orca` in `.env`. It is needed when the run config has a `qm:` section (VALIDATE), and for PREDICT on targets xTB cannot give (`s1_t1_gap`). HOMO-LUMO runs without QM need only xTB, which comes with the Python dependencies. Runs on more than one ORCA core (`orca_nprocs` in the chemistry settings) also need Open MPI: set `OPENMPI_HOME` in `.env` to the folder holding `bin/mpirun` (for example a conda env with `openmpi`), or put `mpirun` on `PATH`; `setup.sh` looks for one. Parallel runs use single-node shared-memory transport with UCX off by default (any `OMPI_MCA_*` you set wins). The PySCF backend is not implemented yet.
 
 ### Choosing the LLM
 
@@ -108,12 +107,11 @@ For tests and fast development runs, set `decisions: rules` in the run config: e
 
 ```bash
 uv sync                       # or: python3.11 -m venv .venv && pip install -e .
-conda create -n xtb -c conda-forge xtb
-cp .env.example .env          # then set XTB_BIN=$(conda run -n xtb which xtb)
+cp .env.example .env          # then set ORCA_BIN=/path/to/orca if you use ORCA
 # add ANTHROPIC_API_KEY to .env
 ```
 
-On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically.
+On Intel Macs, PyTorch is capped at 2.2.2 (the last release with Intel-Mac wheels), which also caps NumPy below 2 and RDKit below 2026. This is handled automatically, but it leaves out OPI (`orca-pi` needs NumPy 2), so ORCA calculations are unavailable there.
 
 ### Optional
 
@@ -188,7 +186,7 @@ summary.
 |---|---|
 | `dataset.csv` | the curated molecules: id, SMILES, XYZ path, values at each level (`ml`, `xtb`, `qm` with `qm_method`), whether QM-validated, and provenance (parent, round, generator, seeds) |
 | `dataset_ml_only.csv` | the curated molecules that have only an ML value (no xTB or QM): id, SMILES, `ml` and provenance. Written once at the end of the run, from `dataset.csv` |
-| `xyz/` | geometries from xTB |
+| `xyz/` | the MMFF94 geometries PREDICT and VALIDATE computed at; `xyz/calculations/<id>/` holds each molecule's geometry report, `predict.json` and `validate.json` records and ORCA files |
 | `models/` | trained ML models, one folder per round |
 | `traces/trace.jsonl` | one JSON line per step; see [`docs/trace-format.md`](docs/trace-format.md) |
 | `summary.md` | a short report of the run and why it stopped |
@@ -220,16 +218,48 @@ state = run_agent(load_config("configs/homo_lumo.yaml"))
 [`notebooks/run_agent.ipynb`](notebooks/run_agent.ipynb) walks through one small run with the real tools (about 2
 minutes) and its results: round stats, `dataset.csv`, the summary and the curated molecules.
 
+## Property tools and batch runs
+
+The chemistry behind PREDICT and VALIDATE is two tool-call functions that take a geometry, a
+property name and a level of theory, and return a JSON-ready dict (`success`, `value`, `unit`,
+`details`, `method`, `notes`, `error`). Each also exports `tool_definition()`, an LLM tool schema.
+
+- `molcurator.chem.orca.calculate_property`: ORCA through OPI, at any ORCA method. Energies,
+  gradients, optimisation, frequencies, thermochemistry, HOMO-LUMO gap, dipole, charges,
+  polarizability, NMR shieldings, g-tensor, TD-DFT excited states (S1, T1, S1-T1 gap), and delta-SCF
+  ionisation potentials and electron affinities.
+- `molcurator.chem.xtb.calculate_property`: GFN2-, GFN1- and IPEA1-xTB through tblite, in-process.
+  Energies, gradients, optimisation, frequencies, HOMO-LUMO gap, dipole, quadrupole, charges, bond
+  orders, IP/EA, with optional ALPB solvation. xTB has no excited states.
+
+`molcurator-properties` runs the same PREDICT (and optionally VALIDATE) over a CSV or SMILES file,
+outside the agent loop:
+
+```bash
+molcurator-properties run generated.csv --out data/runs/batch-001                       # HOMO-LUMO gap, xTB
+molcurator-properties run generated.csv --out data/runs/batch-002 --property s1_t1_gap \
+    --max 0.3 --orca --functional PBE0                                                   # TD-DFT, then QM
+molcurator-properties report data/runs/batch-001 --plots                                 # rebuild reports
+molcurator-properties slurm --config configs/slurm.json --script job.sbatch              # cluster script
+```
+
+Runtime settings (conformers, ORCA cores and memory, timeout) come from the JSON file named by
+`MOLCURATOR_CHEM_CONFIG` (start from `configs/chemistry.example.json`); set `orca_nprocs` above 1
+for parallel ORCA runs (needs Open MPI, see above).
+`python scripts/check_property_tools.py [--smoke --out DIR]` checks the setup.
+
 ## Project structure
 
 ```
 src/molcurator/
 ├── tools/       GENERATE, PREDICT, TRAIN, VALIDATE, CURATE, EVALUATE (one module each)
 ├── agent/       LangGraph graph, agent state, LLM client, prompts
-├── chem/        shared helpers: SMILES/SELFIES conversion, 3D geometry, XYZ I/O
+├── chem/        SMILES/SELFIES conversion, 3D geometry and XYZ I/O, and the property tools:
+│                orca.py (ORCA via OPI), xtb.py (xTB via tblite), backends.py (picks one)
+├── batch/       `molcurator-properties` command: PREDICT/VALIDATE over a file, reports, SLURM
 ├── schemas.py   shared data models (Candidate, PropertyValue, CuratedEntry)
 └── cli.py       `molcurator` command
-configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml)
+configs/         one YAML file per use case (homo_lumo.yaml, tadf.yaml), example chemistry/SLURM settings
 data/seeds/      seed molecules
 data/runs/       per-run outputs (gitignored)
 tests/           tool tests, plus tests/agent/ for the agent

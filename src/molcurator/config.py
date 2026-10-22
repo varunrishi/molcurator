@@ -53,7 +53,9 @@ class LLMSettings(StrictModel):
 
 
 class PredictSettings(StrictModel):
-    n_xtb: int = Field(default=200, ge=1)  # xTB on a random sample of this many new candidates per round (R10.1)
+    # PREDICT on a random sample of this many new candidates per round (R10.1). The name predates
+    # TD-DFT PREDICT: targets xTB cannot give (s1_t1_gap) run B97-3c instead, see tools/predict.py.
+    n_xtb: int = Field(default=200, ge=1)
 
 
 class TrainSettings(StrictModel):

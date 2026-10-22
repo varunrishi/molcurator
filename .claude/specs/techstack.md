@@ -13,25 +13,24 @@
 | Tool | Libraries | Notes |
 |------|-----------|-------|
 | GENERATE | [RDKit](https://www.rdkit.org/), Mol2Mol via [REINVENT4](https://github.com/MolecularAI/REINVENT4), or [STONED SELFIES](https://github.com/the-matter-lab/stoned-selfies) | Seed-based generation of candidate SMILES; RDKit for sanitisation and deduplication |
-| PREDICT | RDKit (3D embedding), xTB | SMILES → 3D geometry → xTB optimisation → property extraction (e.g. HOMO-LUMO gap) |
+| PREDICT | RDKit (MMFF94 geometry), GFN2-xTB through [tblite](https://github.com/tblite/tblite) (Python API), or B97-3c TD-DFT through ORCA when xTB cannot give the target | SMILES → 3D geometry → single-point property (e.g. HOMO-LUMO gap, S1-T1 gap) |
 | TRAIN | [ChemProp](https://github.com/chemprop/chemprop) | Property model trained on the growing dataset; uncertainty estimates (e.g. ensembles) drive the selection for validation |
-| VALIDATE | [ORCA](https://www.faccts.de/orca/) (default, through its Python interface OPI, `orca-pi`) or [PySCF](https://pyscf.org/) (fallback) | Higher-accuracy QM (DFT / TD-DFT for S1 and T1 energies); backend set by `qm.backend` in the run config |
+| VALIDATE | [ORCA](https://www.faccts.de/orca/) through its Python interface OPI (`orca-pi`); PySCF not implemented | Higher-accuracy QM (DFT / TD-DFT for S1 and T1 energies) at `qm.functional` / `qm.basis` |
 | CURATE | pandas + Pydantic models, CSV + XYZ files per run | Stores SMILES, structure and properties for each level of theory |
 | EVALUATE | Custom pipeline over LangGraph traces | Scores agent trajectories and tool-call correctness |
 
 ## Language and environment
 
 - Python 3.11+ (ChemProp v2 requires 3.11)
-- Setup: `scripts/setup.sh` does everything in one command (uv + `uv sync`, xtb, Ollama + model, `.env`); safe to re-run
+- Setup: `scripts/setup.sh` does everything in one command (uv + `uv sync`, ORCA check, Ollama + model, `.env`); safe to re-run
 - Packaging: `pyproject.toml` (setuptools build, `src/` layout), installable with `uv sync` (locked by `uv.lock`) or `pip install -e .`
 - Dev tools (uv dependency group `dev`): pytest, ruff, jupyter
-- Python dependencies: langgraph, langchain-core, anthropic, langchain-openai (optional backend), rdkit, selfies, pyscf, chemprop (brings torch + lightning), pandas, pydantic, pyyaml, typer, python-dotenv
-- Intel-Mac limits, set with platform markers in `pyproject.toml`: torch 2.2.2 (the last Intel-Mac wheel), so `numpy<2` and `rdkit<2026`. Other platforms get current versions.
+- Python dependencies: langgraph, langchain-core, anthropic, langchain-openai (optional backend), rdkit, selfies, pyscf, chemprop (brings torch + lightning), tblite (xTB), orca-pi (OPI), pandas, pydantic, pyyaml, typer, python-dotenv
+- Intel-Mac limits, set with platform markers in `pyproject.toml`: torch 2.2.2 (the last Intel-Mac wheel), so `numpy<2` and `rdkit<2026`; `orca-pi` (needs NumPy 2) is left out there. Other platforms get current versions; `orca-pi` itself pins `rdkit<2026`.
 - External binaries (not on PyPI):
-  - **xtb**: found or installed by `setup.sh`: existing `XTB_BIN` / `PATH`, else a conda-forge env named `xtb`, else the Linux release in `.tools/` (Homebrew also works by hand); the path is saved as `XTB_BIN` in `.env`
   - **Ollama** (optional): serves a local model such as `qwen3:4b` for the OpenAI-compatible backend; not needed for the default Claude backend
-- Settings: `.env` (gitignored, created from `.env.example`): `XTB_BIN`, `ORCA_BIN`, `ANTHROPIC_API_KEY`, `LLM_PROVIDER` (`anthropic` default, or `openai`), `LLM_MODEL` (default `claude-haiku-4-5`), and for the OpenAI-compatible backend only `LLM_BASE_URL` / `LLM_API_KEY`; variables already in the environment take precedence
-  - **ORCA** (default VALIDATE backend): install a current ORCA yourself (free academic licence; setup.sh cannot install it); found through `ORCA_BIN` in `.env`, otherwise `orca` on `PATH`. Driven from Python by OPI (`orca-pi` on PyPI), which needs a recent ORCA 6 release; `orca-pi` is added as a dependency when VALIDATE is built. Without ORCA, set `qm.backend: pyscf` (PySCF is installed with the package)
+- Settings: `.env` (gitignored, created from `.env.example`): `ORCA_BIN`, `OPENMPI_HOME`, `MOLCURATOR_CHEM_CONFIG`, `MOLCURATOR_QC_TIMEOUT_S`, `ANTHROPIC_API_KEY`, `LLM_PROVIDER` (`anthropic` default, or `openai`), `LLM_MODEL` (default `claude-haiku-4-5`), and for the OpenAI-compatible backend only `LLM_BASE_URL` / `LLM_API_KEY`; variables already in the environment take precedence
+  - **ORCA** (VALIDATE, and TD-DFT PREDICT): install ORCA 6.1.1 or newer yourself (free academic licence; setup.sh cannot install it); found through `ORCA_BIN` in `.env`, otherwise `orca` on `PATH`. Driven from Python by OPI (`orca-pi`). More than one core (`orca_nprocs`) needs Open MPI: `OPENMPI_HOME` in `.env` (e.g. a conda env with `openmpi`), else `mpirun` on `PATH`; parallel runs default to shared-memory transport with UCX off
   - **REINVENT4** (optional): Mol2Mol generator, installed from its git repo
 
 ## Project structure
@@ -42,7 +41,8 @@ molcurator/
 ├── src/molcurator/
 │   ├── tools/            generate.py, predict.py, train.py, validate.py, curate.py, evaluate.py
 │   ├── agent/            graph.py (LangGraph), state.py, llm.py (Anthropic client; optional OpenAI-compatible backend), prompts.py
-│   ├── chem/             convert.py (SMILES/SELFIES/RDKit), stoned.py (SELFIES mutation/crossover), geometry.py (3D embedding, XYZ I/O)
+│   ├── chem/             convert.py (SMILES/SELFIES/RDKit), stoned.py (SELFIES mutation/crossover), geometry.py (3D embedding, XYZ I/O), orca.py / xtb.py (property tool calls), backends.py, settings.py
+│   ├── batch/            `molcurator-properties` batch command (reports, SLURM)
 │   ├── schemas.py        Pydantic models shared by all tools
 │   └── cli.py            Typer CLI, installed as `molcurator`
 ├── configs/              homo_lumo.yaml, tadf.yaml (one per use case)

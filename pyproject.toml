@@ -1,8 +1,9 @@
 # Package metadata and dependencies for MolCurator.
-# Full setup (Python deps + xtb + LLM): scripts/setup.sh
+# Full setup (Python deps + LLM): scripts/setup.sh
 # Python deps only, with uv:  uv sync
 #                  with pip:  pip install -e .
-# xtb is not on PyPI; scripts/setup.sh installs it (see README).
+# xTB runs in-process through tblite (a pip package). ORCA is not on PyPI: install it
+# yourself (free academic licence) and set ORCA_BIN or put `orca` on PATH (see README).
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -40,7 +41,9 @@ dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "typer>=0.12",
-    "python-dotenv>=1.0",      # loads settings (XTB_BIN, LLM_*) from .env
+    "python-dotenv>=1.0",      # loads settings (ORCA_BIN, LLM_*) from .env
+    "orca-pi>=2.0 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    "tblite>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -59,15 +62,11 @@ dev = [
 
 [project.scripts]
 molcurator = "molcurator.cli:app"
-molcurator-properties = "molcurator_property_validation.batch:main"
-
-[tool.setuptools.package-dir]
-"molcurator" = "src/molcurator"
-"molcurator_property_validation" = "subprojects/property_validation_v1/src/molcurator_property_validation"
+molcurator-properties = "molcurator.batch.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src", "subprojects/property_validation_v1/src"]
-include = ["molcurator", "molcurator.*", "molcurator_property_validation", "molcurator_property_validation.*"]
+where = ["src"]
+include = ["molcurator", "molcurator.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
