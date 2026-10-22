@@ -155,11 +155,13 @@ output) and asks for a structured answer validated against a Pydantic model.
   When off,
   SELECT QM BATCH, human approval and VALIDATE are skipped every round, and no QM budget is
   used.
-- R11.2 CURATE adds the molecules whose best estimate lies inside the target window (no
-  screening margin), where best means QM if available, else xTB, else ML. With QM on, only
-  QM-validated molecules qualify; with QM off, screened-in molecules qualify on their xTB or
-  ML value. A molecule known only from an extrapolated corrected xTB value (R10.6) is not
-  curated; a QM value, when there is one, still decides.
+- R11.2 CURATE adds every molecule whose xTB value lies inside the target window (no
+  screening margin): the corrected value when `predict.correction` is set (R10.6), extrapolated
+  or not, whatever its QM value and whether or not ML scored it. It also adds the molecules
+  whose best estimate (QM if available, else xTB, else ML) lies inside the window: with QM on,
+  this round's QM-validated ones; with QM off, screened-in ones, so ML-only molecules qualify.
+  (Changed from "best estimate only, extrapolated values skipped": an in-window xTB value is
+  enough, and the dataset's `xtb_extrapolated` column flags the uncertain ones.)
 - R11.3 Each curated entry records the molecule's id, SMILES, structure (XYZ geometry when it
   has one) and its property value at every level it has (ML, xTB, QM), plus whether it was
   QM-validated. With a correction, it also records the calculated `xtb_raw` and `xtb_extrapolated`. The CURATE tool writes the dataset as a table, e.g. CSV, in the run folder.

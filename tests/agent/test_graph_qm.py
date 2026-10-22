@@ -32,7 +32,8 @@ def trace(run_dir: Path) -> list[dict]:
 
 
 def test_qm_on_validates_between_screen_and_curate(tmp_path):
-    """R11.1-R11.3: SELECT QM BATCH and VALIDATE run after SCREEN; only QM-validated molecules are curated."""
+    """R11.1-R11.3: SELECT QM BATCH and VALIDATE run after SCREEN; CURATE adds every molecule whose xTB value is
+    in the window (QM-validated or not) and only the QM batch carries QM values."""
     config = qm_config(max_rounds=2, max_qm_calls=10)
     nodes = nodes_for(config)
     assert nodes[nodes.index("screen"):nodes.index("curate") + 1] == ["screen", "select_qm_batch", "validate", "curate"]
@@ -43,7 +44,23 @@ def test_qm_on_validates_between_screen_and_curate(tmp_path):
     with (tmp_path / "qm" / "dataset.csv").open(newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows and len(rows) == state["dataset_size"]
-    assert all(r["validated"] == "True" and r["qm"] and r["qm_method"] == "dft:B3LYP/def2-SVP" for r in rows)
+    in_window = {m["id"] for m in state["molecules"].values() if m["xtb"] is not None and 3.0 <= m["xtb"] <= 3.5}
+    assert in_window <= {r["id"] for r in rows}  # an in-window xTB value is enough
+    validated = [r for r in rows if r["validated"] == "True"]
+    assert validated and all(r["qm"] and r["qm_method"] == "dft:B3LYP/def2-SVP" for r in validated)
+    assert any(r["validated"] == "False" and not r["qm"] for r in rows)  # outside the QM batch: xTB only
+
+
+def test_xtb_in_window_is_curated_even_when_qm_puts_it_outside(tmp_path):
+    """The xTB value decides CURATE: a molecule whose QM value (fake QM = xTB - 0.1 eV) falls below the window is
+    still curated, and its dataset row keeps that QM value."""
+    state = run_agent(qm_config(max_rounds=2, max_qm_calls=60), tools=Toolset.from_object(FakeToolsRealCurate()),
+                      runs_root=tmp_path, run_id="qm")
+    moved_out = [m for m in state["molecules"].values() if m["qm"] is not None and m["qm"] < 3.0 <= m["xtb"] <= 3.5]
+    assert moved_out and all(m["status"] == "curated" for m in moved_out)
+    with (tmp_path / "qm" / "dataset.csv").open(newline="") as f:
+        rows = {r["id"]: r for r in csv.DictReader(f)}
+    assert all(float(rows[m["id"]]["qm"]) == pytest.approx(m["qm"]) for m in moved_out)
 
 
 def test_rule_spreads_the_qm_budget_over_the_rounds(tmp_path):
