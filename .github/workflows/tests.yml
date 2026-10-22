@@ -1,0 +1,37 @@
+# Runs the test suite on every pull request to main and every push to main, so a merge that
+# breaks something shows a red check on the PR before it lands.
+# ORCA is licensed and installed by hand, so its tests skip here (tests/conftest.py: needs_orca);
+# xTB runs through tblite, a regular dependency, so the xTB tests run.
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:        # a newer push to the same branch or PR replaces a run still in progress
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"   # the version the suite is developed and checked with
+          enable-cache: true
+
+      - name: Install (locked dependencies, with the dev group)
+        run: uv sync --locked
+
+      - name: Run the tests
+        run: uv run pytest -q

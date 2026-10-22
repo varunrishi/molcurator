@@ -50,8 +50,8 @@
       const xtb = system.tools.xtb.found;
       setConnection(xtb ? "live" : "warn", xtb ? "Connected" : "Connected · no xTB",
         `Server ${health.version} at ${api.base() || location.origin}`);
-      banner(xtb ? null : "warn", "Connected, but xTB was not found on the server, so runs cannot start. " +
-        "Set <code>XTB_BIN</code> on the server (see backend/README.md).");
+      banner(xtb ? null : "warn", "Connected, but xTB is not available on the server, so runs cannot start. " +
+        "Install <code>tblite</code> there, or set <code>ORCA_BIN</code> for ORCA's built-in xTB (see app/server/README.md).");
       MOL.form.setConnected(true, system, presets);
       MOL.monitor.refreshList();
     } catch (e) {

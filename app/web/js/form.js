@@ -111,7 +111,7 @@
     const t = state.system.tools;
     const chip = (ok, label, title) => `<span class="chip ${ok ? "good" : "bad"}" title="${esc(title)}">${ok ? "✓" : "✕"} ${label}</span>`;
     box.innerHTML =
-      chip(t.xtb.found, "xTB", t.xtb.path || "xtb not found: set XTB_BIN on the server") +
+      chip(t.xtb.found, "xTB", t.xtb.path || "xTB not available: install tblite on the server, or set ORCA_BIN") +
       chip(t.orca.found, "ORCA", t.orca.path || "ORCA not found: QM validation unavailable") +
       chip(t.anthropic_key.set, "LLM key", t.anthropic_key.set ? "ANTHROPIC_API_KEY is set" : "No ANTHROPIC_API_KEY: rules only") +
       '<span class="note" style="margin-left:4px">Found ≠ tested: a program can be present but still fail to run.</span>';
@@ -258,7 +258,7 @@
       const r = await api.validate(buildConfig());
       state.check = r;
       const seedNotes = state.seed.problems.length && state.seed.canonical
-        ? ["Seed: " + state.seed.problems.join(" ") + " Its children will likely fail in xTB."] : [];
+        ? ["Seed: " + state.seed.problems.join(" ")] : [];  // each note says its own consequence
       const preset = state.presets.find((p) => p.name === $("presetSel").value);
       const presetNotes = preset && preset.config.seeds[0] === buildConfig().seeds[0] ? preset.notes : [];
       box.innerHTML =
