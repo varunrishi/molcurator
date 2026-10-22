@@ -2015,6 +2015,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "catboost" },
     { name = "fastapi" },
     { name = "joblib" },
     { name = "langchain-core" },
@@ -2038,9 +2039,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-catboost = [
-    { name = "catboost" },
-]
 reports = [
     { name = "matplotlib" },
 ]
@@ -2057,7 +2055,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.17" },
-    { name = "catboost", marker = "extra == 'catboost'", specifier = ">=1.2" },
+    { name = "catboost", specifier = ">=1.2" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "joblib", specifier = ">=1.3" },
     { name = "langchain-core", specifier = ">=0.3" },
@@ -2080,7 +2078,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", specifier = ">=0.29" },
 ]
-provides-extras = ["reports", "catboost"]
+provides-extras = ["reports"]
 
 [package.metadata.requires-dev]
 dev = [

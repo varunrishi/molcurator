@@ -30,6 +30,7 @@ from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, RepeatedKFold
 from molcurator.schemas import Candidate, Prediction, PropertyTarget, Status, TrainingExample, TrainResult
 
 _FP_NBITS_FEAT = 1024
+DEFAULT_MODEL = "catboost"  # TRAIN's model unless the run config's train.model says otherwise
 DESCRIPTOR_NAMES = (
     "heavy_atoms", "rings", "aromatic_rings", "aromatic_atoms", "tpsa",
     "logp", "hbd", "hba", "fraction_sp3", "rotatable_bonds",
@@ -195,7 +196,10 @@ def _fit_model(name: str, seed: int, fast: bool) -> Any:
         )
     if name == "ridge_size":
         return Ridge(alpha=1.0)
-    raise ValueError("model must be one of: random_forest, ridge_size")
+    if name == "catboost":  # imported here: traincatboost imports this module
+        from molcurator.tools.traincatboost import _fit_catboost
+        return _fit_catboost(seed, fast)
+    raise ValueError("model must be one of: random_forest, ridge_size, catboost")
 
 
 def _split_groups(data: pd.DataFrame, split: str, group_col: str | None) -> np.ndarray | None:
@@ -345,8 +349,8 @@ def train_property_model(
     molecule (train, val, test and pool) whose elements the model knows, so held-out ring systems also
     reach it; the reported metrics then describe the train-only model, a cautious estimate.
     """
-    if model not in {"random_forest", "ridge_size"}:
-        raise ValueError("model must be one of: random_forest, ridge_size")
+    if model not in {"random_forest", "ridge_size", "catboost"}:
+        raise ValueError("model must be one of: random_forest, ridge_size, catboost")
     if split not in {"parent", "scaffold"}:
         raise ValueError("split must be one of: parent, scaffold")
     sp = _merge_spec(spec)
@@ -760,26 +764,28 @@ def screen_pool(
 
 
 def train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
-    """TRAIN (contract, R10.2, R10.3): fit the random forest on every xTB value so far and save it in model_dir.
+    """TRAIN (contract, R10.2, R10.3): fit CatBoost (the default model) on every xTB value so far and save it.
     A fifth of the examples is held out to measure it, as whole Murcko scaffolds: later rounds bring ring systems
     the model has not seen, and a random split would score it on near-copies of training molecules. The report
     card is saved next to the model. The saved model is the train-only one; train_with(refit_on_all=True)
     makes a train() whose saved model is refitted on every example after it is measured."""
-    return _train(examples, target, model_dir, refit_on_all=False)
+    return _train(examples, target, model_dir, refit_on_all=False, model=DEFAULT_MODEL)
 
 
-def train_with(refit_on_all: bool = False) -> Callable[..., TrainResult]:
-    """train() with the run config's train.refit_on_all, keeping train()'s exact signature (the tool contract)."""
-    if not refit_on_all:
+def train_with(refit_on_all: bool = False, model: str = DEFAULT_MODEL) -> Callable[..., TrainResult]:
+    """train() with the run config's train.refit_on_all and train.model, keeping train()'s exact signature
+    (the tool contract)."""
+    if not refit_on_all and model == DEFAULT_MODEL:
         return train
 
-    def train_refit(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
-        return _train(examples, target, model_dir, refit_on_all=True)
+    def train_configured(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path) -> TrainResult:
+        return _train(examples, target, model_dir, refit_on_all=refit_on_all, model=model)
 
-    return train_refit
+    return train_configured
 
 
-def _train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path, refit_on_all: bool) -> TrainResult:
+def _train(examples: list[TrainingExample], target: PropertyTarget, model_dir: Path, refit_on_all: bool,
+           model: str) -> TrainResult:
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     csv_path = model_dir / "training_data.csv"  # train_property_model reads a CSV; it also records the training set
@@ -790,13 +796,13 @@ def _train(examples: list[TrainingExample], target: PropertyTarget, model_dir: P
     with warnings.catch_warnings(record=True) as caught:  # kept with the model, not printed over the progress lines
         warnings.simplefilter("always")
         card = train_property_model(csv_path, out_dir=model_dir, window=window, train_size=len(examples) - n_test,
-                                    test_size=n_test, split="scaffold", refit_on_all=refit_on_all,
+                                    test_size=n_test, split="scaffold", refit_on_all=refit_on_all, model=model,
                                     spec={"target": "value", "units": target.units, "group_col": None,
                                                             "keep_if": {}, "drop_if": {}})  # agent data: xTB successes only
     if caught:
         card["warnings"] = [str(w.message) for w in caught]
         (model_dir / "report_card.json").write_text(json.dumps(card, indent=2), encoding="utf-8")
-    test, base = card["test_metrics"]["random_forest"], card["test_metrics"]["mean_baseline"]
+    test, base = card["test_metrics"][model], card["test_metrics"]["mean_baseline"]
     split = card["partition"]["actual"]
     metrics = {"test_mae": test["mae"], "test_rmse": test["rmse"], "test_r2": test["r2"],
                "baseline_mae": base["mae"], "go": float(card["go"]),
