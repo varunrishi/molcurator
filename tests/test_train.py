@@ -13,7 +13,7 @@ from tests.agent.test_graph import CONFIG
 
 
 def test_train_then_ml_predict_keeps_the_contract(tmp_path):
-    smiles = [head + "C" * n for n in range(1, 21) for head in ("", "O", "N", "c1ccccc1")]  # 80 small molecules
+    smiles = [head + "C" * n for n in range(1, 17) for head in ("", "O", "N", "c1ccccc1", "c1ccncc1")]  # 80 small molecules
     mols = [Chem.MolFromSmiles(s) for s in smiles]
     examples = [TrainingExample(smiles=s, value=6.0 - 0.15 * m.GetNumHeavyAtoms() + 0.5 * any(a.GetIsAromatic() for a in m.GetAtoms()))
                 for s, m in zip(smiles, mols)]  # a simple, learnable "gap"

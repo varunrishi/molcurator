@@ -394,9 +394,9 @@ def train_property_model(
         for fold, (tr, te) in enumerate(splits):
             fitted = _fit_model(model, seed + fold, fast)
             fit_x = X_train[tr][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[tr]
-            test_x = X_train[te][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[te]
+            fold_val_x = X_train[te][:, [_FP_NBITS_FEAT + DESCRIPTOR_NAMES.index("heavy_atoms")]] if model == "ridge_size" else X_train[te]
             fitted.fit(fit_x, y_train[tr])
-            pred = fitted.predict(test_x)
+            pred = fitted.predict(fold_val_x)
             oof[te] = pred
             fold_rows.append({"fold": fold, "model": model, **_metrics(y_train[te], pred)})
     valid_oof = ~np.isnan(oof)
@@ -472,7 +472,7 @@ def train_property_model(
         window = (float(np.min(y_train)), float(np.max(y_train)))
     oof_frame = train_data[[sp["id_col"], sp["smiles_col"]]].copy()
     oof_frame["y_true"] = y_train
-    oof_frame["oof_random_forest"] = oof
+    oof_frame[f"oof_{model}"] = oof
     oof_frame.to_csv(out / "oof_predictions.csv", index=False)
     test_frame = _heldout_frame(data, test_idx, y_test, test_supported, test_predictions, abs_test_error, elements, sp)
     test_frame.to_csv(out / "test_predictions.csv", index=False)
@@ -608,7 +608,7 @@ def train_property_model(
             int(X_train[:, _FP_NBITS_FEAT].min()), int(X_train[:, _FP_NBITS_FEAT].max())
         ],
         "cv": {"scheme_a": {model: cv_metric, "mean": cv_baseline}},
-        "test_metrics": {"random_forest": test_metric, "mean_baseline": baseline_metric},
+        "test_metrics": {model: test_metric, "mean_baseline": baseline_metric},
         "test_evaluation": {
             "n_total": len(test_idx),
             "n_supported": int(test_supported.sum()),
@@ -616,7 +616,7 @@ def train_property_model(
         },
         "test_predictions": test_frame.to_dict("records"),
         "validation_metrics": (
-            {"random_forest": val_metric, "mean_baseline": val_baseline_metric} if len(val_idx) else None
+            {model: val_metric, "mean_baseline": val_baseline_metric} if len(val_idx) else None
         ),
         "validation_evaluation": {
             "n_total": len(val_idx),
