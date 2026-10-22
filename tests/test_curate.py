@@ -7,7 +7,8 @@ from molcurator.tools.curate import COLUMNS, ML_ONLY_COLUMNS, curate, export_ml_
 
 def test_curate_writes_one_row_per_molecule_and_is_idempotent(tmp_path):
     qm = CuratedEntry(id="r1-c004", smiles="c1ccsc1", xyz_path=tmp_path / "xyz" / "r1-c004.xyz", validated=True,
-                      properties={"xtb": 3.31, "dft:B3LYP/def2-SVP": 3.18}, provenance={"round": "1"})
+                      properties={"xtb": 3.31, "xtb_raw": 0.11, "dft:B3LYP/def2-SVP": 3.18},
+                      provenance={"round": "1", "xtb_extrapolated": "True"})  # xtb corrected from xtb_raw
     ml_only = CuratedEntry(id="r2-c100", smiles="CCO", properties={"ml": 3.2}, provenance={"round": "2"})
     assert curate([qm, ml_only], tmp_path) == 2
     assert curate([qm, ml_only], tmp_path) == 2  # re-run, e.g. on resume: nothing added
@@ -18,6 +19,7 @@ def test_curate_writes_one_row_per_molecule_and_is_idempotent(tmp_path):
     row = rows["r1-c004"]
     assert (row["xyz_path"], row["xtb"], row["qm"], row["qm_method"], row["validated"]) == \
         ("xyz/r1-c004.xyz", "3.31", "3.18", "dft:B3LYP/def2-SVP", "True")
+    assert (row["xtb_raw"], row["xtb_extrapolated"]) == ("0.11", "True")  # its own column, never taken for QM
     assert (rows["r2-c100"]["ml"], rows["r2-c100"]["xtb"], rows["r2-c100"]["xyz_path"]) == ("3.2", "", "")
 
 

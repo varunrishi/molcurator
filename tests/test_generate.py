@@ -91,6 +91,8 @@ def test_no_strained_motifs_in_output():
     "C=C=C", "CC=C=C=CC", "C=C=O",  # allene, cumulene, ketene
     "c1ccc2c(c1)CC2",   # benzocyclobutene: a 4-membered ring fused onto a benzene
     "[NH]c1nnno1", "N#Cc1nnoc1[NH]",  # aminyl radicals from a stranded [nH] token
+    "C1=[SH]C1c1cccs1", "C1=S(c2cccs2)C1", "C=C[SH]1CC=C(c2cccs2)C1",  # hypervalent S from SELFIES edits;
+    "C1=CSS(c2cccs2)=C1",  # xTB gave these near-zero gaps, which looked like hits in a real run
 ])
 def test_strained_motifs_are_rejected(smiles):
     assert is_implausible(smiles)
@@ -99,6 +101,8 @@ def test_strained_motifs_are_rejected(smiles):
 @pytest.mark.parametrize("smiles", [
     "c1ccccc1C#N",                        # nitrile: a triple bond outside a ring is fine
     "O=S(=O)(c1ccccc1)c1ccccc1",          # sulfone: two double bonds on S, a common acceptor
+    "CS(C)=O", "NS(=O)(=O)c1ccccc1",      # sulfoxide, sulfonamide: S(IV)/S(VI) only through =O
+    "c1csc(-c2cccs2)c1", "CSSC", "S=C(N)N",  # bithiophene, disulfide, thiourea: ordinary two-bonded S
     "c1ccccc1N(=O)=O",                    # neutral nitro: likewise not cumulated carbon
     "C1CC1c1ccccc1",                      # lone cyclopropyl: strained only when fused
     "c1ccc2c(c1)CCC2",                    # indane: a fused 5-ring is common and fine

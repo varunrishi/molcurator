@@ -13,14 +13,14 @@ from molcurator.agent.summaries import screened_candidates
 from molcurator.agent.toolset import Toolset
 from molcurator.config import RunConfig, load_config
 from tests.agent.fakes import FakeTools
-from tests.agent.test_graph import CONFIG, FakeToolsRealCurate
+from tests.agent.test_graph import FakeToolsRealCurate, raw_config
 
 QM = {"backend": "orca", "functional": "B3LYP", "basis": "def2-SVP"}  # naming a method turns QM on (R11.1)
 
 
 def qm_config(n_candidates: int = 100, **budget) -> RunConfig:
     """The HOMO-LUMO config with a qm: section, and a dataset target out of reach so budgets end the run."""
-    data = load_config(CONFIG).model_dump()
+    data = raw_config().model_dump()
     data["qm"] = QM
     data["generation"]["defaults"]["n_candidates"] = n_candidates
     data["budget"].update(target_dataset_size=1000, **budget)
