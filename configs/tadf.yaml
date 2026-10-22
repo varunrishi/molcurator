@@ -11,6 +11,8 @@ screening:
 # That takes minutes per molecule instead of seconds, so the per-round sample is small.
 predict:
   n_xtb: 20  # molecules computed per round (the name predates TD-DFT PREDICT)
+  # method: r2SCAN-3c   # another PREDICT level (default B97-3c); xTB cannot give S1-T1
+  # basis: def2-SVP     # only for methods without their own basis, e.g. method: PBE0
 train:
   min_examples: 15  # train once this many have a PREDICT value (below n_xtb: some runs fail)
 # Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.

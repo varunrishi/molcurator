@@ -8,6 +8,10 @@ seeds:
   - "c1ccc(-c2cccs2)s1"  # PLACEHOLDER: 2,2'-bithiophene; replace with the real seed molecule
 screening:
   margin: 0.2  # xTB screen accepts 2.8-3.7 eV (xTB is systematically offset from QM)
+# PREDICT's level of theory; default GFN2-xTB. Uncomment to change it, e.g. GFN1-xTB or a DFT method.
+# predict:
+#   method: gfn1-xtb
+#   basis: def2-SVP   # only for methods without their own basis (not xTB or -3c)
 # Uncomment to validate hits with QM (slow); without a qm: section the run skips QM.
 # The functional must be DFT (or HF), not xTB: PREDICT already uses GFN2-xTB here.
 # qm:

@@ -38,6 +38,7 @@ def main(argv=None) -> int:
     run.add_argument("--property", default="homo_lumo_gap", help="target property (default homo_lumo_gap)")
     run.add_argument("--units", default="eV")
     run.add_argument("--predict-method", help="PREDICT method; default GFN2-xTB, or B97-3c when xTB cannot give it")
+    run.add_argument("--predict-basis", help="PREDICT basis set, for methods without their own (default def2-SVP)")
     run.add_argument("--orca", action="store_true", help="QM-validate successful predictions inside the window")
     run.add_argument("--orca-limit", type=int, help="maximum molecules sent to QM in this invocation")
     run.add_argument("--min", "--min-gap", dest="min", type=float, help="lower end of the QM selection window")

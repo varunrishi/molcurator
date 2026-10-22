@@ -71,6 +71,8 @@ Tool-specific obligations:
   e.g. `r{round}-c{index:03d}`. Use `tools/generate.py` as the worked example.
 - **PREDICT** (done): MMFF94 geometry, then GFN2-xTB through tblite (`chem/xtb.py`), or B97-3c
   TD-DFT through ORCA (`chem/orca.py`) for targets xTB cannot give, such as the S1-T1 gap.
+  A run config's `predict.method` / `predict.basis` override that; `Toolset.default(config.predict)`
+  wraps PREDICT so its contract signature stays `(candidates, target, xyz_dir)`.
   Writes each geometry to `xyz_dir/<id>.xyz` and returns the path.
 - **VALIDATE** (done, ORCA driven from Python by OPI / `orca-pi`; PySCF not implemented): starts
   from each molecule's PREDICT geometry, and names the level of theory in `method`

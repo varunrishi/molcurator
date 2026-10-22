@@ -170,6 +170,19 @@ qm:
   basis: def2-SVP
 ```
 
+**Levels of theory.** VALIDATE uses `qm.functional` / `qm.basis`. PREDICT defaults to GFN2-xTB, or
+B97-3c TD-DFT for targets xTB cannot give (S1-T1); set `predict.method` / `predict.basis` to change it:
+
+```yaml
+predict:
+  method: PBE0        # any ORCA method, or gfn2-xtb / gfn1-xtb
+  basis: def2-SVP     # only for methods without their own basis (not xTB or "-3c" methods)
+```
+
+The config is refused when it loads if the choice cannot work: xTB for an S1-T1 target, a basis
+for a method with its own, or the same level for PREDICT and VALIDATE. The batch command takes
+`--predict-method` / `--predict-basis` and `--functional` / `--basis` for the same settings.
+
 With QM on:
 - SELECT QM BATCH and VALIDATE run between SCREEN and CURATE.
 - Only QM-validated molecules inside the target window are curated.

@@ -48,7 +48,13 @@ def run_batch(args, *, predict_fn, validate_fn) -> int:
     if args.orca_limit is not None and args.orca_limit < 0:
         raise ValueError("--orca-limit must be nonnegative")
     from molcurator.chem.backends import backend_for
-    from molcurator.tools.predict import default_method
+    from molcurator.tools.predict import check_predict_level, default_method
+    qm_level = (args.functional, args.basis) if args.orca else (None, None)
+    try:
+        check_predict_level(target.name, args.predict_method, args.predict_basis, *qm_level)
+    except ValueError as exc:  # same check as a run config, named after this command's options
+        raise ValueError(str(exc).replace("predict.method", "--predict-method")
+                         .replace("predict.basis", "--predict-basis")) from exc
     predict_method = args.predict_method or default_method(target)
     check_allocation(settings, args.orca or backend_for(predict_method) == "orca")
     dataset = [candidate.model_dump(mode="json") for candidate in candidates]
@@ -72,7 +78,7 @@ def run_batch(args, *, predict_fn, validate_fn) -> int:
                  "input_path": str(Path(args.input).resolve()), "input_fingerprint": fingerprint,
                  "started_at": datetime.now(UTC).isoformat(), "run_status": "running",
                  "settings": settings.model_dump(), "target": {"name": target.name, "units": target.units, **window},
-                 "predict_method": predict_method, "qm": qm.model_dump(mode="json") if args.orca else None,
+                 "predict_method": predict_method, "predict_basis": args.predict_basis, "qm": qm.model_dump(mode="json") if args.orca else None,
                  "orca_limit": args.orca_limit,
                  "rows": [{"candidate": c, "prediction": None, "qm_result": None,
                            "qm_selection": "pending" if args.orca else "not_requested"} for c in dataset]}
@@ -86,7 +92,7 @@ def run_batch(args, *, predict_fn, validate_fn) -> int:
         token = active_settings.set(settings)  # one frozen copy for the whole invocation
         try:
             for candidate, row in zip(candidates, state["rows"], strict=True):
-                prediction = predict_fn([candidate], target, output / "xyz", predict_method)[0]
+                prediction = predict_fn([candidate], target, output / "xyz", predict_method, args.predict_basis)[0]
                 row["prediction"] = prediction.model_dump(mode="json")
                 checkpoint()
                 if prediction.status is Status.failed:

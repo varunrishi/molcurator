@@ -3,7 +3,14 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from rdkit import Chem
 
 from molcurator.schemas import GenerationSettings, PropertyTarget, QMSettings
@@ -56,6 +63,10 @@ class PredictSettings(StrictModel):
     # PREDICT on a random sample of this many new candidates per round (R10.1). The name predates
     # TD-DFT PREDICT: targets xTB cannot give (s1_t1_gap) run B97-3c instead, see tools/predict.py.
     n_xtb: int = Field(default=200, ge=1)
+    # PREDICT's level of theory. None: GFN2-xTB when xTB can give the target, else B97-3c.
+    # Any ORCA method or xTB name (gfn2-xtb, gfn1-xtb); basis only for methods without their own.
+    method: str | None = None
+    basis: str | None = None
 
 
 class TrainSettings(StrictModel):
@@ -96,6 +107,14 @@ class RunConfig(StrictModel):
     decisions: Literal["llm", "rules"] = "llm"  # "rules": no LLM calls at all (R9.4)
     llm: LLMSettings = LLMSettings()
     rng_seed: int = 0  # passed to generate, so a run is repeatable (R7.2)
+
+    @model_validator(mode="after")
+    def _predict_level_works(self) -> "RunConfig":
+        # Checked here, so an impossible PREDICT level stops the run before any calculation.
+        from molcurator.tools.predict import check_predict_level
+        qm = (self.qm.functional, self.qm.basis) if self.qm.enabled else (None, None)
+        check_predict_level(self.target.name, self.predict.method, self.predict.basis, *qm)
+        return self
 
     @field_validator("seeds")
     @classmethod

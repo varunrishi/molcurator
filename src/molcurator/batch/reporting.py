@@ -117,7 +117,8 @@ def generate_report(root, plots: bool = False) -> dict:
               "qm_failed": sum(r["qm_status"] == "failed" for r in rows)}
     lines = ["# Molecular property batch report", "", f"Run status: {state['run_status']}",
              f"Invocation: {state['invocation_id']}", f"Property: {prop} ({unit})",
-             f"PREDICT method: {state['predict_method']}", "", "## Current results", "",
+             f"PREDICT method: {state['predict_method']}" + (f"/{state['predict_basis']}" if state.get("predict_basis") else ""),
+             "", "## Current results", "",
              (f"Candidates: {counts['total']}; predicted: {counts['predict_ok']}; prediction failed: "
               f"{counts['predict_failed']}."),
              f"QM validated: {counts['qm_ok']}; QM failed: {counts['qm_failed']}.",

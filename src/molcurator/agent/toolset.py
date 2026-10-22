@@ -13,10 +13,14 @@ class Toolset:
     curate: Callable
 
     @classmethod
-    def default(cls) -> "Toolset":
-        """The real tools. Imported here, so code that only uses fakes never loads their dependencies."""
+    def default(cls, predict_settings=None) -> "Toolset":
+        """The real tools. Imported here, so code that only uses fakes never loads their dependencies.
+        predict_settings (the run config's predict: section) sets PREDICT's method and basis."""
         from molcurator.tools import curate, generate, predict, train, validate
-        return cls(generate.generate, predict.predict, train.train, train.ml_predict, validate.validate, curate.curate)
+        method = predict_settings.method if predict_settings else None
+        basis = predict_settings.basis if predict_settings else None
+        return cls(generate.generate, predict.predict_at(method, basis), train.train, train.ml_predict,
+                   validate.validate, curate.curate)
 
     @classmethod
     def from_object(cls, tools) -> "Toolset":

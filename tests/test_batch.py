@@ -24,9 +24,9 @@ def source(tmp_path):
 def tools(monkeypatch):
     calls = []
 
-    def predict(candidates, target, directory, method=None):
+    def predict(candidates, target, directory, method=None, basis=None):
         candidate = candidates[0]
-        calls.append(("predict", candidate.id, method))
+        calls.append(("predict", candidate.id, method) + ((basis,) if basis else ()))
         if candidate.smiles == "invalid":
             return [Prediction(candidate_id=candidate.id, status=Status.failed, error="invalid SMILES")]
         directory.mkdir(exist_ok=True, parents=True)
@@ -81,6 +81,19 @@ def test_xtb_validation_method_is_refused_before_execution(tmp_path, source, too
     assert tools == [] and "--functional is 'gfn2-xtb'" in capsys.readouterr().err
 
 
+def test_predict_level_options_reach_predict_and_are_checked(tmp_path, source, tools, capsys):
+    args = ["run", str(source), "--out", str(tmp_path / "run"), "--predict-method", "PBE0", "--predict-basis",
+            "def2-TZVP", "--no-plots"]
+    cli.main(args)
+    assert tools[0] == ("predict", "good", "PBE0", "def2-TZVP")
+    assert "PREDICT method: PBE0/def2-TZVP" in (tmp_path / "run/report.md").read_text()
+    bad = ["run", str(source), "--out", str(tmp_path / "r2"), "--predict-method", "gfn2-xtb", "--predict-basis", "x"]
+    assert cli.main(bad) == 2 and "--predict-basis 'x' would be ignored" in capsys.readouterr().err
+    same = ["run", str(source), "--out", str(tmp_path / "r3"), "--orca", "--predict-method", "B3LYP"]
+    assert cli.main(same) == 2 and "VALIDATE must use a higher level" in capsys.readouterr().err
+    assert len(tools) == 2 and not (tmp_path / "r2").exists()
+
+
 def test_changed_resume_input_is_rejected(tmp_path, source, tools):
     args = ["run", str(source), "--out", str(tmp_path / "run"), "--no-plots"]
     cli.main(args)
@@ -123,10 +136,10 @@ def test_qm_limit_and_window_are_explicit(tmp_path, tools):
 def test_interruption_keeps_checkpoint_and_releases_lock(tmp_path, source, tools, monkeypatch):
     original = cli.predict
 
-    def interrupted(candidates, target, directory, method=None):
+    def interrupted(candidates, target, directory, method=None, basis=None):
         if candidates[0].id == "bad":
             raise KeyboardInterrupt
-        return original(candidates, target, directory, method)
+        return original(candidates, target, directory, method, basis)
 
     monkeypatch.setattr(cli, "predict", interrupted)
     args = ["run", str(source), "--out", str(tmp_path / "run"), "--no-plots"]
@@ -228,7 +241,8 @@ def test_slurm_quotes_paths_and_passes_the_property():
     config = slurm.SlurmSettings(project_dir="/home/user/my project", input="/work/input's.csv",
                                  out="/work/results", orca=True, orca_limit=3, modules=["gcc/12", "openmpi/4"],
                                  cpus_per_task=4, chemistry_config="/work/chemistry.json", resume=True,
-                                 property="s1_t1_gap", max_value=0.3, functional="PBE0")
+                                 property="s1_t1_gap", max_value=0.3, functional="PBE0",
+                                 predict_method="PBE0", predict_basis="def2-SVP")
     script = slurm.render(config)
     assert "#SBATCH --cpus-per-task=4" in script
     assert "cd -- '/home/user/my project'" in script
@@ -236,6 +250,7 @@ def test_slurm_quotes_paths_and_passes_the_property():
     assert command[:3] == ["/home/user/my project/.venv/bin/python", "-m", "molcurator.batch.cli"]
     assert "/work/input's.csv" in command and "--resume" in command and "--orca" in command
     assert command[command.index("--property") + 1] == "s1_t1_gap" and command[command.index("--max") + 1] == "0.3"
+    assert command[command.index("--predict-basis") + 1] == "def2-SVP"
     assert "module load gcc/12 openmpi/4" in script
 
 

@@ -35,6 +35,7 @@ class SlurmSettings(BaseModel):
     openmpi_home: str | None = None  # for orca_nprocs > 1 when Open MPI is not loaded as a module
     property: str = "homo_lumo_gap"
     predict_method: str | None = None
+    predict_basis: str | None = None
     orca: bool = Field(default=False, strict=True)
     orca_limit: int | None = Field(default=None, ge=0, strict=True)
     min_value: float | None = None
@@ -56,7 +57,7 @@ class SlurmSettings(BaseModel):
             raise ValueError("SLURM names must contain only letters, numbers, dots, underscores or hyphens")
         return value
 
-    @field_validator("property", "predict_method", "functional", "basis")
+    @field_validator("property", "predict_method", "predict_basis", "functional", "basis")
     @classmethod
     def keywords(cls, value):
         if value is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_+*(),./-]*", value):
@@ -107,6 +108,8 @@ def render(config: SlurmSettings) -> str:
                  "--property", config.property]
     if config.predict_method:
         arguments += ["--predict-method", config.predict_method]
+    if config.predict_basis:
+        arguments += ["--predict-basis", config.predict_basis]
     if config.orca:
         arguments.append("--orca")
     if config.orca_limit is not None:
