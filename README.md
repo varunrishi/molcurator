@@ -166,6 +166,7 @@ summary.
 | File | Contents |
 |---|---|
 | `dataset.csv` | the curated molecules: id, SMILES, XYZ path, values at each level (`ml`, `xtb`, `qm` with `qm_method`), whether QM-validated, and provenance (parent, round, generator, seeds) |
+| `dataset_ml_only.csv` | the curated molecules that have only an ML value (no xTB or QM): id, SMILES, `ml` and provenance. Written once at the end of the run, from `dataset.csv` |
 | `xyz/` | geometries from xTB |
 | `models/` | trained ML models, one folder per round |
 | `traces/trace.jsonl` | one JSON line per step; see [`docs/trace-format.md`](docs/trace-format.md) |
@@ -178,9 +179,11 @@ summary.
   rounds, decide whether to continue and write the summary; it needs `ANTHROPIC_API_KEY` in `.env`, and the
   rules take over whenever an answer is invalid or late.
 - **QM validation is off** (`qm.enabled: false`) and not yet wired into the agent.
-- **Molecules screened in by ML alone are curated too,** with an empty `xtb` column in `dataset.csv`. TRAIN
-  starts once `train.min_examples` (150) xTB values exist; its test MAE is about 0.4 eV, so treat ML-only
-  rows as candidates to check, not confirmed hits.
+- **Molecules screened in by ML alone are curated too,** with an empty `xtb` column in `dataset.csv`, and
+  are also listed on their own in `dataset_ml_only.csv`. TRAIN learns only from xTB values, never from ML
+  predictions, and starts once `train.min_examples` (150) xTB values exist. Its test MAE is about 0.5 eV and
+  it rarely picks molecules inside the target window correctly, so treat ML-only rows as candidates to check,
+  not confirmed hits.
 
 From Python:
 

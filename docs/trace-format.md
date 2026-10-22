@@ -97,7 +97,7 @@ that SCREEN leaves alone, are absent from that node's list.
 | `curate` | `candidate_ids` (the hits) | `dataset_size` (total so far), `results`; `{}` when nothing was curated |
 | `close_round` | `{}` | `round_stats`: this round's counts (`generated`, `duplicates`, `xtb_runs`, `ml_predicted`, `unscored`, `failed`, `screened_in`, `selected`, `qm_calls`, `hits`) |
 | `continue_or_stop` | `{}` | `round` (the next round) when continuing, or `stop_reason` |
-| `write_summary` | `{}` | `stop_reason` |
+| `write_summary` | `{}` | `stop_reason`, `ml_only_size` (rows written to `dataset_ml_only.csv`) |
 
 `stop_reason` is one of `target_dataset_size`, `max_rounds`, `max_qm_calls`, `max_wall_time`
 (a budget), `llm` (the decider stopped early) or `error`.
