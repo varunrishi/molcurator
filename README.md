@@ -36,14 +36,11 @@ The workflow is a fixed sequence of tool steps. A fast language model (Claude Ha
 3. **Validate**: for the screened candidates, use the prediction uncertainty to pick which ones to confirm with quantum chemistry calculations.
 4. **Curate**: store each verified molecule with its SMILES, 3D structure and a set of properties computed by methods of different accuracy.
 
-```
-seed molecule + target property
-        │
-        ▼
-   GENERATE ──► PREDICT / SCREEN (ML + uncertainty) ──► VALIDATE (QM) ──► CURATE ──► benchmark set
-        ▲                    │                                               │
-        └──── TRAIN (retrain ML model on the growing dataset) ◄──────────────┘
-```
+<p align="center">
+  <img src="assets/agent-workflow.png" alt="One round of the MolCurator agent: plan, generate, predict, train, ML predict, screen, optional QM validation, curate, close round, then continue or stop and write the summary" width="100%">
+</p>
+
+Each round, the LLM **decides** (purple) what to explore, which candidates deserve DFT and when to stop; **tools** (teal) do the chemistry; fixed **rules** (grey) screen, curate and enforce the budget, so the budget always wins.
 
 ## Tools
 
