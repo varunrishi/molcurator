@@ -371,11 +371,23 @@ assets/          logo and README images
 
 ## Roadmap
 
-| Day | Date | Goal |
-|-----|------|------|
-| 1 | 20 Oct 2026 | Build the basic structure of each tool: GENERATE, PREDICT, TRAIN, VALIDATE, CURATE, EVALUATE |
-| 2 | 21 Oct 2026 | Connect the tools to the LangGraph orchestrator and test on the HOMO-LUMO gap and TADF use cases |
-| 3 | 22 Oct 2026 | Prepare the demo presentation and record a short project video |
+MolCurator started as a three-day hackathon project (20-22 Oct 2026): build the six tools, wire them
+into the LangGraph orchestrator, and demonstrate both use cases end to end. That is done.
+
+The work since then is tracked in [`.claude/specs/roadmap.md`](.claude/specs/roadmap.md), as six
+phases with one GitHub issue per item:
+
+| Phase | Goal |
+|-------|------|
+| 4 | **Multi-property foundations** — several objectives per run, a property registry, uncertainty-driven validation, per-property corrections. Blocks the rest. |
+| 5 | **More properties** — excitation energy and oscillator strength, transition and ground-state dipoles, drug-likeness (Ro5, logP, TPSA, QED), synthesizability, binding affinity |
+| 6 | **More generators** — a generator interface, Mol2Mol, fragment recombination |
+| 7 | **More models** — Gaussian process, graph neural network, multimodal fusion, agent-chosen models |
+| 8 | **Evaluation** — QM9/MoleculeNet benchmarks, baselines against the no-LLM agent, trajectory metrics, database and literature lookup |
+| 9 | **Publishing** — reproducibility pack, current specs, housekeeping |
+
+Current focus is Phase 4, with Phase 8's benchmark runs started early because they take wall-clock
+time.
 
 ## References
 
