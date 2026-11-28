@@ -69,13 +69,24 @@ electronic property together, and the cheap filter demonstrably cuts the QM bill
 
 ## Phase 6: More ways to generate
 
-- [ ] #71 Generator plugin interface, and land the Mol2Mol (REINVENT4) backend behind it.
-- [ ] #72 Fragment-based combinatorial generation (BRICS / RECAP decompose and recombine).
+The agent loop is already a genetic algorithm — best parents in, mutate, score, select, breed from the
+winners — so a new generator is usually a new operator in that loop rather than a new paradigm. The
+operators below differ in inductive bias on purpose: string mutation, graph crossover, fragment
+replacement, and construction from reactions.
+
+- [ ] #71 Extract the shared candidate filter and write generator contract tests. Mol2Mol (REINVENT4)
+      is **not** planned; the specs that promise it are corrected under #83.
+- [ ] #72 A second operator for the fragment lane: CReM, or BRICS / RECAP recombination.
+- [ ] #86 GraphGA — graph crossover and mutation. Also an arm in #79, since it is the baseline that
+      matches or beats much heavier generative models on goal-directed generation.
+- [ ] #87 Reaction-based enumeration: robust reaction SMARTS over catalog building blocks, so every
+      candidate carries a one-step route. Makes synthesizability structural rather than scored (#69).
 - [ ] #73 3D-structure-aware mutation — design note first: mutate the conformer, or mutate the graph and
       re-embed?
 
-**Exit criteria:** a run can choose its generator from the config, and the generators are compared on
-the same target and budget.
+**Exit criteria:** a run can choose its generator from the config, and the operators are compared on
+the same target and budget — hits per QM call, scaffold diversity, and how many candidates survive the
+filter.
 
 ## Phase 7: More models
 
