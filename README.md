@@ -387,7 +387,8 @@ phases with one GitHub issue per item:
 | 9 | **Publishing** — reproducibility pack, current specs, housekeeping |
 
 Current focus is Phase 4, with Phase 8's benchmark runs started early because they take wall-clock
-time.
+time. **[Issue #88](https://github.com/varunrishi/molcurator/issues/88) indexes the open work** and
+says what to pick up first; `ready` labels the issues with no outstanding dependency.
 
 ## References
 
