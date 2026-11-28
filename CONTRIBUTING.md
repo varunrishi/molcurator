@@ -85,6 +85,29 @@ Tool-specific obligations:
 When in doubt, compare against `FakeTools` in `tests/agent/fakes.py`: it follows the same
 contract and shows exactly the shape the agent receives.
 
+## Picking something to work on
+
+Open work lives in issues [#60-#87](https://github.com/varunrishi/molcurator/issues), indexed by
+[**#88 — Roadmap: where to start**](https://github.com/varunrishi/molcurator/issues/88), which is
+pinned on the repo front page. It groups everything into waves and says what to do first.
+
+**Nothing is assigned.** Comment on an issue to claim it, then assign yourself. If something is
+already claimed, say so in the thread rather than starting in parallel.
+
+Two labels tell you what is takeable:
+
+- [`ready`](https://github.com/varunrishi/molcurator/issues?q=is%3Aissue+is%3Aopen+label%3Aready) —
+  nothing it depends on is outstanding, so it can be started today.
+- [`good first issue`](https://github.com/varunrishi/molcurator/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) —
+  self-contained, with an existing pattern in the repo to follow.
+
+An issue without `ready` names its dependency in a "Depends on" section. The six
+[`blocking`](https://github.com/varunrishi/molcurator/issues?q=is%3Aissue+is%3Aopen+label%3Ablocking)
+issues hold up the most other work, so they are the best use of a free afternoon.
+
+Longer-range direction is in [`.claude/specs/roadmap.md`](.claude/specs/roadmap.md), with per-phase
+exit criteria.
+
 ## Workflow
 
 1. **Branch from `main`:** `git switch -c tools/<tool> origin/main` (e.g. `tools/predict-xtb`).
@@ -101,7 +124,7 @@ to `main`**, separate from tool work, and tell the team. Don't bury it inside a 
 
 ## Known open items
 
-- `tools/generate.py` caps candidates at 15 heavy atoms, which is too small for TADF emitters.
-  The planned fix is a per-config `max_heavy_atoms` in the contract.
+- `tools/generate.py` caps candidates at 15 heavy atoms, which is too small for TADF emitters and
+  far too small for drug-like molecules. The planned fix is a per-config cap: #64.
 - ORCA must be a current release installed by hand, with `ORCA_BIN` set in `.env`.
-- The seed molecules in `configs/homo_lumo.yaml` and `configs/tadf.yaml` are placeholders.
+- The seed molecule in `configs/tadf.yaml` is a placeholder: #84.
