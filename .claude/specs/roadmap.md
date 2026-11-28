@@ -37,7 +37,7 @@ Build each tool as a standalone, testable unit with a clear input/output interfa
 The blocking phase. Each item here is what keeps Phases 5-7 from becoming a fork of the pipeline,
 and the uncertainty item closes a gap between what the README claims and what the code does.
 
-- [ ] #60 **Multi-objective targets**: `target` becomes a list of objectives, each with its own window,
+- [ ] #60 **Multi-objective targets** (sub-issues #91-#94): `target` becomes a list of objectives, each with its own window,
       unit and weight. Touches `schemas.py`, `config.py` and the screen node.
 - [ ] #61 **Property registry**: properties become pluggable (compute function, unit, cost tier, backend)
       instead of the `SCALAR_PROPERTIES` tuple in `chem/properties.py`. Extends #59.
@@ -101,7 +101,7 @@ enough that the QM batch chosen by it beats the closeness-to-target rule.
 ## Phase 8: Evaluation
 
 - [ ] #78 External benchmark harness: QM9 / MoleculeNet held-out evaluation, building on `chem/qm9.py`.
-- [ ] #79 Baseline comparison: random generation, a model-only loop, and the rule-based (no-LLM) agent
+- [ ] #79 Baseline comparison (sub-issues #95-#98): random generation, a model-only loop, and the rule-based (no-LLM) agent
       against the full agent on the same budget.
 - [ ] #80 Agentic trajectory metrics: tool-call efficiency, redundant calls, decision-overturn rate, and a
       concretely defined hallucination rate (e.g. the LLM naming a candidate not in state).
@@ -117,7 +117,10 @@ Start this phase early and in parallel: the benchmark runs take wall-clock time.
       figure and table in the paper from a tagged commit.
 - [ ] #83 Keep these specs current: this roadmap, `mission.md` and `techstack.md` (which still lists
       PySCF as a dependency with no backend).
-- [ ] #84 Housekeeping: implement or drop the PySCF backend, replace the placeholder TADF seed in
+- [ ] #84 Add ruff to CI alongside pytest — do this early: lint added late means fixing every
+      accumulated violation at once.
+- [ ] #89 Remove or implement the unused PySCF backend (a declared dependency nothing calls).
+- [ ] #90 Replace the placeholder seed in `configs/tadf.yaml` with a cited literature emitter.
       `configs/tadf.yaml`, and run ruff in CI alongside pytest.
 
 **Exit criteria:** a reviewer can clone the tagged commit, run one command, and get the paper's
